@@ -6,9 +6,16 @@ lands on the paper a little off its cell (the way a ribbon really leaves it), an
 steps on. Type to the end of a line and the bell rings; press Enter and the carriage gets thrown
 back, picks up speed and bangs into the margin stop.
 
-**[Try it →](https://wisdomousai.github.io/typewriter/)**
+**[Try it →](https://wisdomousai.github.io/typewriter/)** · [Chat](https://wisdomousai.github.io/typewriter/chat/) · [Duet](https://wisdomousai.github.io/typewriter/duet/) · [Teleprinter](https://wisdomousai.github.io/typewriter/teleprinter/)
 
 It is an experiment, and still moving.
+
+- [What you can play with](#what-you-can-play-with)
+- [The chat](#the-chat), [the duet](#the-duet) and [the teleprinter](#the-teleprinter)
+- [Install](#install) and [use it in your own page](#use-it-in-your-own-page)
+- [Run your own chat](#run-your-own-chat)
+- [An agent skill](#an-agent-skill)
+- [How it's made](#how-its-made)
 
 ## What you can play with
 
@@ -40,17 +47,24 @@ room is in the link (`/chat/?room=…`), so you share a room by sharing the addr
 holds the line and types at a time; everyone else sees every character land on their own
 paper as it is typed, each typist in their own ink, with their name in front.
 
-Just type. If the line is free it's yours at once; if someone else holds it, you join the
-queue and what you type waits under the room's status until your turn, when it goes out. The
-flag on the side of your machine says where you stand:
+Just type. If the line is free it's yours at once, and stays yours until you press **Enter**
+(**Shift+Enter** is a new line). If someone else holds it, you join the queue and what you type
+waits under the room's status; press Enter when it's finished and it goes out on your turn,
+and the line goes on after it. The flag on the side of your machine says where you stand:
 
-- **Green**: the line is yours. Type. *Over* (or Escape) hands it on.
+- **Green**: the line is yours. Type, and Enter (or *Over*, or Escape) hands it on.
 - **Yellow with a number**: your place in line.
 - **Bordeaux**: someone else is typing and you aren't in line.
 - **Down**: nobody is typing.
 
-If you don't start within 15 seconds, or stop for 10, the line goes to whoever is next. You can
+If you don't start within 15 seconds, or stop for 30, the line goes to whoever is next. You can
 dress your machine: a colour, an antenna, stickers, a horn, a desk lamp.
+
+Before a machine comes in, the page asks for a captcha
+([Turnstile](https://developers.cloudflare.com/turnstile/)); passing it gets a pass that is
+good for two hours, so a reload doesn't ask again. The chat is kept small on purpose: at most
+10 machines at once across all rooms, a machine idle for 15 minutes (or in for an hour) is let
+go, and a room forgets everything, history and all, once its last person leaves.
 
 The rooms run on a Cloudflare Worker with one Durable Object per room (`chat/src/index.ts`).
 The sockets use the hibernation API, so a quiet room costs nothing. The room keeps who holds
@@ -58,6 +72,120 @@ the line, the turn being typed, and the last 60 turns, for whoever comes in late
 machine gets the same characters in the same order, so every machine lays the conversation out
 the same way (`src/chat/printer.ts`). The messages between page and room are typed in
 `src/chat/protocol.ts`.
+
+## The duet
+
+**[Duet →](https://wisdomousai.github.io/typewriter/duet/)**
+
+Two typewriters side by side in one chat room, on one captcha. Click a machine and type: what
+you type lands on the other one's paper too. It's the chat for one person, to see how it works
+without a second browser; *Open in the chat* takes the same room to the full chat page.
+
+## The teleprinter
+
+**[Teleprinter →](https://wisdomousai.github.io/typewriter/teleprinter/)**
+
+A second robot machine, built the same way: an old teleprinter that prints telegrams on
+endless paper at its own steady pace. Its typewheel spins round to each character and pecks
+it onto the paper as the head steps along a rail. A dial on the front calls each telegram in,
+a bell rings twice, and a lamp shows when it's on a line.
+
+- **Send a telegram** from the page: a header in faint ink (the time and who it's from), the
+  message in capitals broken at spaces, a blank line after.
+- **Send it as a link.** *Copy link* puts the message in the address (`?m=…&from=…`), and
+  whoever opens it watches it come in.
+- **Listen to a chat room.** Name a room and the teleprinter joins it as a person of its own.
+  It never holds the line, and prints each turn once it's over, in the typist's ink.
+
+## Install
+
+The machines are TypeScript modules on three.js, with their models as `.glb` files. Install
+from GitHub:
+
+```sh
+bun add github:wisdomousai/typewriter three   # or npm install / pnpm add
+```
+
+The models are in the package's `public/models/`. Serve them from your site, for instance by
+copying them into your own `public/`:
+
+```sh
+mkdir -p public/models && cp node_modules/typewriter/public/models/*.glb public/models/
+```
+
+The modules are TypeScript and import JSON, so they need a bundler that handles both: Vite,
+Astro, Next and Bun all do. The paper is typed in [Maple Mono](https://font.subf.dev/) when the page
+has it (`import '@fontsource/maple-mono/400.css'`), in the system's monospace otherwise.
+
+## Use it in your own page
+
+A typewriter on a canvas, typing whatever you send it:
+
+```ts
+import { mountTypewriter } from 'typewriter/typewriter';
+
+const { typewriter, start } = mountTypewriter(canvas, {
+  models: '/models/',
+  look: 'colour',       // 'ink', 'paper' or 'colour'
+  layout: 'us-qwerty',  // or 'emoji', 'de-qwertz', … or a layout of your own (below)
+  endless: true,        // a roll rather than sheets
+  volume: 0.7,
+});
+start();
+await typewriter.ready;
+typewriter.strike('H', { line: 0, col: 0 });
+```
+
+The whole page form, keys, paper and all (the demo's front page), is `setUpDesk` in
+`typewriter/desk`, on the markup in `src/components/Typewriter.astro` (an Astro component;
+in anything else, copy its HTML).
+
+A teleprinter, printing telegrams:
+
+```ts
+import { mountTeleprinter } from 'typewriter/teleprinter';
+import { Wire } from 'typewriter/telegram';
+
+const { teleprinter, start } = mountTeleprinter(canvas, { models: '/models/', volume: 0.7 });
+start();
+const wire = new Wire(teleprinter);
+await wire.send({ text: 'Arriving Tuesday', from: 'Ada' }); // resolves once it's printed
+```
+
+Both machines have a canvas of their own and stop drawing while they're off screen. Call
+`dispose()` on what `mount…` returned to take one down.
+
+## Run your own chat
+
+The chat's server is a Cloudflare Worker (`chat/`): one Durable Object per room, and one more,
+the gate, that keeps the count of machines. On the free plan this costs nothing at this size.
+
+1. `npx wrangler login`
+2. List your site's origin in `ORIGINS` at the top of `chat/src/index.ts` (pages from anywhere
+   else are turned away).
+3. Once, make the captcha and the Worker's secrets:
+
+   ```sh
+   DOMAINS=you.github.io sh chat/setup.sh
+   ```
+
+   It creates a Turnstile widget for those domains, puts its secret and a key to sign passes
+   with on the Worker (`TURNSTILE_SECRET`, `PASS_KEY`), and writes the widget's site key into
+   `.env.production` as `PUBLIC_TURNSTILE_SITEKEY`.
+4. `bun run chat:deploy`, and put the Worker's address in `.env.production` as
+   `PUBLIC_CHAT_URL` (`wss://…workers.dev`).
+5. Build the site (`bun run build`) and serve `dist/`.
+
+How many machines may be in at once, across all rooms, is `MAX_SESSIONS` in
+`chat/wrangler.jsonc` (10). The 11th is told the chat is full. Idle and stay limits are at the
+top of `chat/src/index.ts`.
+
+## An agent skill
+
+`skills/typewriter/SKILL.md` teaches a coding agent (Claude Code, or anything that reads
+skills) to put a typewriter or a teleprinter in a page and to send telegrams as links. It's
+optional. To use it, copy the folder into your project's `.claude/skills/` (or
+`~/.claude/skills/` for every project).
 
 ## How it's made
 
@@ -106,16 +234,19 @@ To change the machine itself, edit `blender/typewriter.py` and run `bun run mode
 Blender; it is built with 5.1). It rebuilds `public/models/typewriter.glb` and writes the measurements
 the page needs into `src/typewriter/typewriter.json`.
 
+To change the teleprinter, edit `blender/teleprinter.py` and run `bun run model teleprinter`.
+
 ### The chat locally
 
 ```sh
+cp chat/.dev.vars.example chat/.dev.vars   # Turnstile's test secret: every captcha passes
 bun run chat       # the rooms, on ws://localhost:8787
 bun run dev        # then open http://localhost:5214/typewriter/chat/
 ```
 
-`bun run chat:deploy` deploys the Worker (needs `wrangler login`). The built site talks to the
-address in `PUBLIC_CHAT_URL` (`.env.production`), or to `ws://localhost:8787` without it. The
-Worker only lets in pages from the origins listed at the top of `chat/src/index.ts`.
+Without `PUBLIC_TURNSTILE_SITEKEY` the page uses Turnstile's test site key, which pairs with
+the test secret. The built site talks to the address in `PUBLIC_CHAT_URL`, or to
+`ws://localhost:8787` without it.
 
 ### A layout of your own
 
@@ -123,7 +254,7 @@ A layout is four rows of keys, 11, 12, 12 and 11 long (`src/typewriter/layouts.t
 the characters it types: plain, then with Shift, then with Alt Gr.
 
 ```ts
-import { mountTypewriter } from './src/typewriter/typewriter';
+import { mountTypewriter } from 'typewriter/typewriter';
 
 mountTypewriter(canvas, {
   models: '/models/',

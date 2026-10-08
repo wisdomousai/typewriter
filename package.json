@@ -2,7 +2,33 @@
   "name": "typewriter",
   "private": true,
   "type": "module",
-  "description": "A robot typewriter in the browser: every key, typebar, spring and bell live in three.js, with layouts you can swap (emoji too).",
+  "description": "Robot machines in the browser: a typewriter whose every key, typebar, spring and bell move live in three.js, a teleprinter that prints telegrams on endless paper, and a chat where each person types on their own.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wisdomousai/typewriter.git"
+  },
+  "homepage": "https://wisdomousai.github.io/typewriter/",
+  "exports": {
+    "./typewriter": "./src/typewriter/typewriter.ts",
+    "./desk": "./src/typewriter/desk.ts",
+    "./layouts": "./src/typewriter/layouts.ts",
+    "./looks": "./src/typewriter/looks.ts",
+    "./teleprinter": "./src/teleprinter/teleprinter.ts",
+    "./telegram": "./src/teleprinter/telegram.ts",
+    "./chat": "./src/chat/chat.ts",
+    "./models/*": "./public/models/*"
+  },
+  "files": [
+    "src/typewriter",
+    "src/teleprinter",
+    "src/chat",
+    "src/components",
+    "public/models",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -14,14 +40,18 @@
     "chat:check": "tsc -p chat"
   },
   "dependencies": {
-    "@fontsource/maple-mono": "^5.3.0",
-    "astro": "^7.3.8",
-    "three": "^0.186.1"
+    "@fontsource/maple-mono": "^5.3.0"
+  },
+  "peerDependencies": {
+    "three": ">=0.180.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@cloudflare/workers-types": "^5.20261008.1",
+    "@fontsource/maple-mono": "^5.3.0",
     "@types/three": "^0.186.0",
+    "astro": "^7.3.8",
+    "three": "^0.186.1",
     "typescript": "^6.0.2",
     "wrangler": "^4.149.0"
   }
