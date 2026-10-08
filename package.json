@@ -17,7 +17,10 @@
     "./teleprinter": "./src/teleprinter/teleprinter.ts",
     "./telegram": "./src/teleprinter/telegram.ts",
     "./chat": "./src/chat/chat.ts",
-    "./models/*": "./public/models/*"
+    "./models/*": "./public/models/*",
+    "./desk.css": "./src/components/desk.css",
+    "./pass": "./src/chat/pass.ts",
+    "./protocol": "./src/chat/protocol.ts"
   },
   "files": [
     "src/typewriter",
@@ -27,7 +30,8 @@
     "public/models",
     "skills",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "chat"
   ],
   "scripts": {
     "dev": "astro dev",

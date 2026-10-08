@@ -224,7 +224,7 @@ import '../styles/teleprinter.css';
         keep();
         teleprinter.dress(mine.look);
         teleprinter.reducedMotion = mine.still;
-        mounted.sounds.volume = mine.sound ? VOLUME : 0;
+        mounted.sounds.setVolume(mine.sound ? VOLUME : 0);
       });
     </script>
   </body>

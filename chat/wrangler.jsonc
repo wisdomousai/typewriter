@@ -17,7 +17,8 @@
     { "tag": "v1", "new_sqlite_classes": ["Room"] },
     { "tag": "v2", "new_sqlite_classes": ["Gate"] }
   ],
-  // Machines in the chat at once, across all rooms.
-  "vars": { "MAX_SESSIONS": "10" },
+  // Machines in the chat at once, across all rooms, and the sites whose pages may open a room
+  // (comma separated; local pages always may).
+  "vars": { "MAX_SESSIONS": "10", "ORIGINS": "https://wisdomousai.github.io" },
   "observability": { "enabled": true }
 }

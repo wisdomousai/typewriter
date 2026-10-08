@@ -8,7 +8,7 @@
  * check passes (and which the local server's test secret accepts).
  */
 
-export const SITEKEY: string = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? '1x00000000000000000000AA';
+export const SITEKEY: string = import.meta.env?.PUBLIC_TURNSTILE_SITEKEY ?? '1x00000000000000000000AA';
 const STORE = 'typewriter-chat-pass';
 /** A pass with less than this left is asked for again (ms). */
 const MARGIN = 5 * 60 * 1000;
@@ -55,13 +55,14 @@ function turnstile(): Promise<Turnstile> {
   return script;
 }
 
-/** The captcha in `box`, then a pass for it from the server at `server` (http(s)://). */
-export async function getPass(server: string, box: HTMLElement): Promise<string> {
+/** The captcha in `box`, then a pass for it from the server at `server` (http(s)://). The
+ * widget's site key is `sitekey`, or PUBLIC_TURNSTILE_SITEKEY on a Vite build. */
+export async function getPass(server: string, box: HTMLElement, sitekey = SITEKEY): Promise<string> {
   const ts = await turnstile();
   box.replaceChildren();
   const token = await new Promise<string>((resolve, reject) => {
     ts.render(box, {
-      sitekey: SITEKEY,
+      sitekey,
       theme: 'auto',
       size: 'flexible',
       callback: resolve,

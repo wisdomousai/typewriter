@@ -36,17 +36,22 @@ interface Env {
   GATE: DurableObjectNamespace<Gate>;
   /** Machines in the chat at once, across all rooms. */
   MAX_SESSIONS?: string;
+  /** The sites whose pages may open a room, comma separated (https://you.example). Local
+   * pages (localhost, 127.0.0.1) always may. */
+  ORIGINS?: string;
   /** Turnstile's secret for the widget the page shows, and the key passes are signed with. */
   TURNSTILE_SECRET: string;
   PASS_KEY: string;
 }
 
-/** Pages that may open a room. */
-const ORIGINS = [
-  /^https:\/\/wisdomousai\.github\.io$/,
-  /^http:\/\/localhost(:\d+)?$/,
-  /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-];
+/** Pages that may open a room: local ones, and the sites in ORIGINS. */
+const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const allows = (env: Env, origin: string) =>
+  LOCAL.test(origin) ||
+  (env.ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .includes(origin);
 
 /** How long a pass is good for, a seat's lease, how often a room renews its seats, and how
  * long a machine may sit idle or stay at all (ms). */
@@ -60,7 +65,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') ?? '';
-    const allowed = ORIGINS.some((o) => o.test(origin));
+    const allowed = allows(env, origin);
     if (url.pathname === '/pass') {
       const cors: Record<string, string> = allowed ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {};
       if (request.method === 'OPTIONS')

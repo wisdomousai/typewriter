@@ -161,8 +161,8 @@ The chat's server is a Cloudflare Worker (`chat/`): one Durable Object per room,
 the gate, that keeps the count of machines. On the free plan this costs nothing at this size.
 
 1. `npx wrangler login`
-2. List your site's origin in `ORIGINS` at the top of `chat/src/index.ts` (pages from anywhere
-   else are turned away).
+2. List your site's origin in `vars.ORIGINS` in `chat/wrangler.jsonc`, comma separated (pages
+   from anywhere else are turned away; local ones always may connect).
 3. Once, make the captcha and the Worker's secrets:
 
    ```sh
@@ -183,8 +183,9 @@ top of `chat/src/index.ts`.
 ## An agent skill
 
 `skills/typewriter/SKILL.md` teaches a coding agent (Claude Code, or anything that reads
-skills) to put a typewriter or a teleprinter in a page and to send telegrams as links. It's
-optional. To use it, copy the folder into your project's `.claude/skills/` (or
+skills) to put the machines into your own site: a hero that types a line, a contact form typed
+onto the paper, a teleprinter printing your messages, or the chat on your own Cloudflare
+account, in Astro, React/Next, Svelte or plain Vite. It's optional. To use it, copy the folder into your project's `.claude/skills/` (or
 `~/.claude/skills/` for every project).
 
 ## How it's made
