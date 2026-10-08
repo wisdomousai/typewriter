@@ -14,7 +14,6 @@ It is an experiment, and still moving.
 - [The chat](#the-chat), [the duet](#the-duet) and [the teleprinter](#the-teleprinter)
 - [Install](#install) and [use it in your own page](#use-it-in-your-own-page)
 - [Run your own chat](#run-your-own-chat)
-- [An agent skill](#an-agent-skill)
 - [How it's made](#how-its-made)
 
 ## What you can play with
@@ -179,14 +178,6 @@ the gate, that keeps the count of machines. On the free plan this costs nothing 
 How many machines may be in at once, across all rooms, is `MAX_SESSIONS` in
 `chat/wrangler.jsonc` (10). The 11th is told the chat is full. Idle and stay limits are at the
 top of `chat/src/index.ts`.
-
-## An agent skill
-
-`skills/typewriter/SKILL.md` teaches a coding agent (Claude Code, or anything that reads
-skills) to put the machines into your own site: a hero that types a line, a contact form typed
-onto the paper, or a teleprinter printing your messages, in Astro, React/Next, Svelte or
-plain Vite. It's optional. To use it, copy the folder into your project's `.claude/skills/` (or
-`~/.claude/skills/` for every project).
 
 ## How it's made
 
