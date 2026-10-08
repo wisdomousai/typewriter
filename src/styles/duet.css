@@ -1,0 +1,30 @@
+.pair {
+  display: grid;
+  gap: 1rem 2rem;
+}
+
+@media (min-width: 56rem) {
+  .pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.duet .seat {
+  display: grid;
+  gap: 0.5rem;
+  cursor: text;
+}
+
+.duet .stage {
+  aspect-ratio: 1 / 1;
+  max-height: calc(100dvh - 9rem);
+}
+
+.duet .status {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.duet .room a {
+  color: var(--ink);
+}

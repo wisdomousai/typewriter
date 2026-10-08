@@ -1,0 +1,149 @@
+---
+import '@fontsource/maple-mono/400.css';
+import '@fontsource/maple-mono/700.css';
+import Nav from '../components/Nav.astro';
+import '../styles/global.css';
+import '../styles/chat.css';
+import '../styles/duet.css';
+
+// Two machines in one room, side by side: what one types lands on the other's paper.
+const MACHINES = [
+  { name: 'Left', palette: 'typewriter' },
+  { name: 'Right', palette: 'coral' },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Typewriter duet</title>
+  </head>
+  <body>
+    <main class="chat duet">
+      <header>
+        <Nav current="duet" />
+        <div class="room">
+          <span>Room</span>
+          <code data-room></code>
+          <a data-open href="">Open in the chat</a>
+        </div>
+      </header>
+
+      <div class="pair">
+        {
+          MACHINES.map((m) => (
+            <section class="seat" data-name={m.name} data-palette={m.palette}>
+              <div class="stage">
+                <canvas aria-hidden="true" />
+                <textarea
+                  class="keys"
+                  aria-label={`Type on ${m.name}`}
+                  autocapitalize="off"
+                  autocomplete="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                />
+              </div>
+              <p class="status" data-status>
+                {m.name}
+              </p>
+            </section>
+          ))
+        }
+      </div>
+
+      <dialog class="join">
+        <form method="dialog">
+          <div class="check" data-check></div>
+          <button disabled>Start</button>
+        </form>
+      </dialog>
+    </main>
+
+    <script>
+      import { setUpChat, type ChatView } from '../chat/chat';
+      import { forgetPass, getPass, storedPass } from '../chat/pass';
+      import { ROOM } from '../chat/protocol';
+
+      const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+      const SERVER = (import.meta.env.PUBLIC_CHAT_URL ?? 'ws://localhost:8787').replace(/\/$/, '');
+      const HTTP = SERVER.replace(/^ws/, 'http');
+
+      const url = new URL(location.href);
+      let room = url.searchParams.get('room') ?? '';
+      if (!ROOM.test(room)) {
+        room = Math.random().toString(36).slice(2, 10);
+        url.searchParams.set('room', room);
+        history.replaceState(null, '', url);
+      }
+      document.querySelector('[data-room]')!.textContent = room;
+      document.querySelector<HTMLAnchorElement>('[data-open]')!.href = `${BASE}chat/?room=${room}`;
+
+      const seats = [...document.querySelectorAll<HTMLElement>('.seat')];
+      let chats: ReturnType<typeof setUpChat>[] = [];
+
+      function status(seat: HTMLElement, v: ChatView) {
+        const name = seat.dataset.name!;
+        const el = seat.querySelector<HTMLElement>('[data-status]')!;
+        el.dataset.flag = v.mine ? 'yours' : v.place ? 'waiting' : v.line.floor ? 'busy' : 'free';
+        el.textContent = v.ended
+          ? v.notice || `${name}: let go.`
+          : v.state !== 'open'
+            ? `${name}: connecting…`
+            : v.mine
+              ? `${name}: the line is yours.`
+              : v.place
+                ? `${name}: number ${v.place} in line.`
+                : v.line.floor
+                  ? `${name}: ${v.people.find((p) => p.id === v.line.floor)?.name ?? 'someone'} is typing.`
+                  : `${name}: the line is free.`;
+        if (v.ended === 'pass') {
+          forgetPass();
+          setTimeout(start);
+        }
+      }
+
+      function join(pass: string) {
+        chats = seats.map((seat) =>
+          setUpChat(seat.querySelector<HTMLElement>('.stage')!, {
+            url: `${SERVER}/room/${room}?pass=${encodeURIComponent(pass)}`,
+            models: `${BASE}models/`,
+            name: () => seat.dataset.name!,
+            look: () => 'colour',
+            palette: seat.dataset.palette!,
+            decor: ['antenna'],
+            volume: 0.5,
+            reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+            onChange: (v) => status(seat, v),
+          }),
+        );
+        chats[0]?.focus();
+        if (import.meta.env.DEV) Object.assign(window, { chats });
+      }
+
+      // One captcha, one pass, both machines.
+      const dialog = document.querySelector<HTMLDialogElement>('dialog.join')!;
+      const startButton = dialog.querySelector('button')!;
+      function start() {
+        for (const c of chats) c.dispose();
+        chats = [];
+        const pass = storedPass();
+        if (pass) return join(pass);
+        dialog.showModal();
+        getPass(HTTP, dialog.querySelector<HTMLElement>('[data-check]')!)
+          .then((p) => {
+            startButton.disabled = false;
+            dialog.addEventListener('close', () => join(p), { once: true });
+          })
+          .catch((e: Error) => (dialog.querySelector('[data-check]')!.textContent = e.message));
+      }
+      start();
+
+      // A click on a machine, and the keys type on it.
+      seats.forEach((seat, i) => seat.addEventListener('pointerdown', () => chats[i]?.focus()));
+    </script>
+  </body>
+</html>

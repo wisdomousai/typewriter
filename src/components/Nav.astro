@@ -1,13 +1,14 @@
 ---
 // The pages, named, at the top of each.
 interface Props {
-  current: 'typewriter' | 'chat' | 'teleprinter';
+  current: 'typewriter' | 'chat' | 'duet' | 'teleprinter';
 }
 const { current } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const pages = [
   ['typewriter', 'Typewriter', base],
   ['chat', 'Chat', `${base}chat/`],
+  ['duet', 'Duet', `${base}duet/`],
   ['teleprinter', 'Teleprinter', `${base}teleprinter/`],
 ] as const;
 ---
