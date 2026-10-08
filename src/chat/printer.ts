@@ -2,10 +2,14 @@ import { split } from '../typewriter/layouts';
 import type { Spot, Typewriter } from '../typewriter/typewriter';
 import type { Turn } from './protocol';
 
+/** The bell rings this many columns before the margin. */
+const BELL = 5;
+
 /**
  * The chat on the typewriter's endless paper. Each turn starts on a fresh line, a blank
  * line after the last, with its typist's name in capitals; what they type follows, in their
- * ink, a character to a cell, on to the next line at the margin. Every machine in the room
+ * ink, a character to a cell, on to the next line at the first space past the bell (or at
+ * the margin, for a word too long to wait). Every machine in the room
  * gets the same characters in the same order, so every machine lays them out the same.
  *
  * What is typed live is struck by the machine, one character at a time; what was typed
@@ -73,7 +77,9 @@ export class Printer {
     if (!turn) return;
     for (const ch of split(text)) {
       turn.text += ch;
-      if (ch === '\n') {
+      // A line break, or a space past the bell (where a typist would throw the carriage back
+      // rather than start a word that won't fit).
+      if (ch === '\n' || (ch === ' ' && this.at.col >= this.columns - BELL)) {
         turn.spots.push({ at: { ...this.at }, ch });
         this.newline(1, quick);
         continue;
