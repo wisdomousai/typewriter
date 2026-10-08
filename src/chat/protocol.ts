@@ -88,11 +88,20 @@ export const LIMITS = {
   /** Turns a room keeps. */
   history: 60,
   /** People in a room. */
-  people: 40,
+  people: 8,
   /** How long the line waits for its holder to start typing, and for them to go on (ms). */
   first: 15000,
   idle: 10000,
 };
+
+/** Why a room closed a machine's socket for good (WebSocket close codes): the chat is full,
+ * the machine sat idle or stayed too long, or its pass (the captcha's) is missing or out of
+ * date. A machine doesn't come back by itself after one of these. */
+export const CLOSED = {
+  full: 4001,
+  idle: 4002,
+  pass: 4003,
+} as const;
 
 /** A room's name: lower-case letters, digits and dashes. */
 export const ROOM = /^[a-z0-9-]{1,40}$/;

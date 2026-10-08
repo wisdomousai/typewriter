@@ -5,3 +5,4 @@ blender/build/
 blender/__pycache__/
 .DS_Store
 .wrangler/
+.dev.vars

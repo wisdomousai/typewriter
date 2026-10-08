@@ -246,3 +246,9 @@ aside legend {
   overflow-wrap: anywhere;
   color: var(--ink);
 }
+
+.join .check {
+  min-height: 65px;
+  margin: 0.75rem 0;
+  font-size: var(--text-sm);
+}

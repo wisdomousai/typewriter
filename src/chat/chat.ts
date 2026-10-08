@@ -54,6 +54,10 @@ export interface ChatView {
   mine: boolean;
   /** What you've typed while waiting your turn: it goes out when the line is yours. */
   draft: string;
+  /** The room let this machine go for good: the chat was full, it sat idle, or its pass ran
+   * out (the page does the check again). And what the room last said about it. */
+  ended: 'full' | 'idle' | 'pass' | null;
+  notice: string;
 }
 
 export function setUpChat(root: HTMLElement, opts: ChatOptions) {
@@ -76,6 +80,8 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     place: 0,
     mine: false,
     draft: '',
+    ended: null,
+    notice: '',
   };
   let shifted: string | null = null;
 
@@ -86,9 +92,15 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
   }));
   link.onState = (state) => {
     view.state = state;
+    view.ended = link.ended;
     tell();
   };
   link.onMessage = (m) => {
+    // What the room says about this machine is for the page at once.
+    if (m.t === 'error') {
+      view.notice = m.message;
+      return tell();
+    }
     if (!printer) early.push(m);
     else hear(m);
   };
@@ -170,7 +182,7 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
         p.end();
         break;
       case 'error':
-        console.warn('chat:', m.message);
+        view.notice = m.message;
         break;
     }
     tell();

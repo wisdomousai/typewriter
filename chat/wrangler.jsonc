@@ -1,13 +1,23 @@
 {
   // The typewriter chat's rooms: one Durable Object per room, opened over a WebSocket at
-  // /room/NAME. `npx wrangler dev` runs it locally (on :8787), `npx wrangler deploy` ships it.
+  // /room/NAME, and the Gate that keeps the seats. `bun run chat` runs it locally (on :8787,
+  // with Turnstile's always-pass test keys from chat/.dev.vars), `bun run chat:deploy` ships it.
+  // Deployed, it needs two secrets: TURNSTILE_SECRET and PASS_KEY (see chat/setup.sh).
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "typewriter-chat",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
   "durable_objects": {
-    "bindings": [{ "name": "ROOM", "class_name": "Room" }]
+    "bindings": [
+      { "name": "ROOM", "class_name": "Room" },
+      { "name": "GATE", "class_name": "Gate" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Gate"] }
+  ],
+  // Machines in the chat at once, across all rooms.
+  "vars": { "MAX_SESSIONS": "10" },
   "observability": { "enabled": true }
 }

@@ -60,6 +60,20 @@ export const BOLT_FACE: FaceLayout = {
 };
 
 /** A little picture drawn on the screen: a heart, star or flower, drawn `progress` of the way. */
+/** The machines' screen face (the typewriter's, the teleprinter's): wide, eyes either side of a small mouth (see faces.py LAYOUTS). */
+export const TYPEWRITER_FACE: FaceLayout = {
+  width: 512,
+  height: 176,
+  eyes: [
+    [0.3, 0.42],
+    [0.7, 0.42],
+  ],
+  rx: 0.06,
+  ry: 0.26,
+  line: 0.03,
+  mouth: [0.5, 0.82],
+};
+
 export interface Doodle {
   shape: 'heart' | 'star' | 'flower';
   /** 0..1 of the outline drawn so far. */

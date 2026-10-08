@@ -62,6 +62,7 @@ const DECOR = [
               <button type="button" data-action="hold">Hold the line</button>
               <button type="button" data-action="leave" hidden>Leave the line</button>
               <button type="button" data-action="over" hidden>Over</button>
+              <button type="button" data-action="again" hidden>Come back in</button>
             </div>
           </section>
 
@@ -115,6 +116,7 @@ const DECOR = [
             <span>Your name</span>
             <input name="name" maxlength="20" required autocomplete="nickname" />
           </label>
+          <div class="check" data-check></div>
           <button>Join</button>
         </form>
       </dialog>
@@ -122,11 +124,13 @@ const DECOR = [
 
     <script>
       import { setUpChat, type ChatView } from '../chat/chat';
+      import { forgetPass, getPass, storedPass } from '../chat/pass';
       import { ROOM } from '../chat/protocol';
       import type { LookName } from '../typewriter/looks';
 
       const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-      const SERVER = import.meta.env.PUBLIC_CHAT_URL ?? 'ws://localhost:8787';
+      const SERVER = (import.meta.env.PUBLIC_CHAT_URL ?? 'ws://localhost:8787').replace(/\/$/, '');
+      const HTTP = SERVER.replace(/^ws/, 'http');
       const STORE = 'typewriter-chat';
 
       // The room: from the address, or a new one (and the address says so, to share).
@@ -171,10 +175,13 @@ const DECOR = [
       const button = (a: string) => document.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
 
       function show(v: ChatView) {
+        // Let go for good: out of date passes do the check again; the rest can come back in.
+        if (v.ended === 'pass') return void setTimeout(again);
         const name = (id: string | null) => v.people.find((p) => p.id === id)?.name ?? 'Someone';
         status.dataset.flag = v.mine ? 'yours' : v.place ? 'waiting' : v.line.floor ? 'busy' : 'free';
-        status.textContent =
-          v.state !== 'open'
+        status.textContent = v.ended
+          ? v.notice || 'The chat let this machine go.'
+          : v.state !== 'open'
             ? 'Connecting…'
             : v.mine
               ? 'The line is yours: type.'
@@ -183,7 +190,9 @@ const DECOR = [
                 : v.line.floor
                   ? `${name(v.line.floor)} is typing.`
                   : 'The line is free: type.';
-        button('hold').hidden = v.mine || !!v.place;
+        if (v.ended) status.dataset.flag = 'free';
+        button('again').hidden = !v.ended;
+        button('hold').hidden = v.mine || !!v.place || !!v.ended;
         button('leave').hidden = !v.place;
         button('over').hidden = !v.mine;
         draft.hidden = !v.draft;
@@ -207,7 +216,7 @@ const DECOR = [
       let chat: ReturnType<typeof setUpChat> | null = null;
       function join() {
         chat = setUpChat(document.querySelector<HTMLElement>('.stage')!, {
-          url: `${SERVER.replace(/\/$/, '')}/room/${room}`,
+          url: `${SERVER}/room/${room}?pass=${encodeURIComponent(pass!)}`,
           models: `${BASE}models/`,
           name: () => mine.name,
           look: () => mine.look,
@@ -220,24 +229,51 @@ const DECOR = [
         if (import.meta.env.DEV) Object.defineProperty(window, 'chat', { get: () => chat, configurable: true });
       }
 
-      // A name first, then in.
+      // A name and the captcha first (a pass this browser still has will do), then in.
       const dialog = document.querySelector<HTMLDialogElement>('dialog.join')!;
-      if (mine.name) join();
-      else {
-        dialog.showModal();
-        dialog.addEventListener('close', () => {
-          const name = (dialog.querySelector('input') as HTMLInputElement).value.trim();
-          if (!name) return dialog.showModal();
-          mine.name = name;
-          el<HTMLInputElement>('name').value = name;
-          keep();
-          join();
-        });
+      const nameField = dialog.querySelector<HTMLInputElement>('input[name="name"]')!;
+      const joinButton = dialog.querySelector<HTMLButtonElement>('button')!;
+      const checkBox = dialog.querySelector<HTMLElement>('[data-check]')!;
+      let pass = storedPass();
+      function ask() {
+        nameField.value = mine.name;
+        joinButton.disabled = !pass;
+        if (!dialog.open) dialog.showModal();
+        if (pass) return;
+        getPass(HTTP, checkBox)
+          .then((p) => {
+            pass = p;
+            joinButton.disabled = false;
+          })
+          .catch((e: Error) => (checkBox.textContent = e.message));
       }
+      dialog.addEventListener('close', () => {
+        const name = nameField.value.trim();
+        if (!name || !pass) return dialog.showModal();
+        mine.name = name;
+        el<HTMLInputElement>('name').value = name;
+        keep();
+        join();
+      });
+      /** In again after the room let this machine go (with a fresh pass, if that was why). */
+      function again() {
+        const ended = chat?.view.ended;
+        chat?.dispose();
+        chat = null;
+        if (ended === 'pass' || !storedPass()) {
+          forgetPass();
+          pass = null;
+          return ask();
+        }
+        join();
+      }
+      if (mine.name && pass) join();
+      else ask();
 
       button('hold').addEventListener('click', () => chat?.hold());
       button('leave').addEventListener('click', () => chat?.leave());
       button('over').addEventListener('click', () => chat?.over());
+      button('again').addEventListener('click', again);
       button('copy').addEventListener('click', async () => {
         try {
           await navigator.clipboard.writeText(location.href);

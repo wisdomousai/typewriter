@@ -1,0 +1,4 @@
+# Local development: Turnstile's published test secret (every token passes) and any key for
+# signing passes. Copy to chat/.dev.vars.
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+PASS_KEY=local-only

@@ -22,7 +22,7 @@ import {
   Vector2,
   Vector3,
 } from 'three';
-import { Face, type FaceLayout } from './face';
+import { Face, TYPEWRITER_FACE as FACE } from './face';
 import { keyChars, type Layout, LAYOUTS, type LayoutName, POSITIONS } from './layouts';
 import { dress, glowColour, type LookName, type Outfit } from './looks';
 import { loadModel } from './model';
@@ -97,20 +97,6 @@ export interface Geometry {
    * depth]. */
   keys?: Record<string, number[]>;
 }
-
-/** The screen face: wide, eyes either side of a small mouth (see faces.py LAYOUTS). */
-const FACE: FaceLayout = {
-  width: 512,
-  height: 176,
-  eyes: [
-    [0.3, 0.42],
-    [0.7, 0.42],
-  ],
-  rx: 0.06,
-  ry: 0.26,
-  line: 0.03,
-  mouth: [0.5, 0.82],
-};
 
 const TYPE = SPEC.type;
 const LINES = 64;
