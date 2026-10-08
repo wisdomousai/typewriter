@@ -3,38 +3,35 @@ import {
   BufferGeometry,
   CanvasTexture,
   type Camera,
-  DirectionalLight,
   BackSide,
   Box3,
   Color,
   Float32BufferAttribute,
   Group,
-  HemisphereLight,
   Matrix4,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
-  PerspectiveCamera,
   type Plane,
-  Quaternion,
   Ray,
   Raycaster,
-  Scene,
   SRGBColorSpace,
   Sphere,
   type SkinnedMesh,
   Uint16BufferAttribute,
   Vector2,
   Vector3,
-  WebGLRenderer,
 } from 'three';
 import { Face, type FaceLayout } from './face';
 import { keyChars, type Layout, LAYOUTS, type LayoutName, POSITIONS } from './layouts';
-import { dress, glowColour, type LookName, type Outfit, outlineUniforms } from './looks';
+import { dress, glowColour, type LookName, type Outfit } from './looks';
 import { loadModel } from './model';
 import { Paper, type Spot } from './paper';
-import { type SoundEvent, type SoundName, Sounds } from './sound';
+import { clampStep, Hinge, Slider } from './rig';
+import { Route } from './route';
+import type { SoundEvent, SoundName } from './sound';
 import { Spring, wobble } from './spring';
+import { type Machine, mountStage, type StageOptions } from './stage';
 import SPEC from './typewriter.json';
 
 export type { Spot } from './paper';
@@ -168,194 +165,6 @@ function keyboard(layout: Layout) {
 /** Is the character a picture (an emoji) rather than a letter or a sign? */
 export const isPicture = (ch: string) => /\p{Extended_Pictographic}/u.test(ch);
 
-/** A bone that turns about one axis, from where it rests. `axis` is in the bone's frame. */
-class Hinge {
-  private rest: Quaternion;
-  private q = new Quaternion();
-  private last = 0;
-
-  constructor(
-    readonly bone: Object3D,
-    private axis: Vector3,
-  ) {
-    this.rest = bone.quaternion.clone();
-  }
-
-  set(angle: number) {
-    if (angle === this.last) return;
-    this.last = angle;
-    this.bone.quaternion.copy(this.rest).multiply(this.q.setFromAxisAngle(this.axis, angle));
-  }
-}
-
-/** A bone that slides along one direction of the model's, from where it rests. */
-class Slider {
-  private rest: Vector3;
-  private dir: Vector3;
-  private last = 0;
-
-  constructor(
-    readonly bone: Object3D,
-    model: Object3D,
-    dir: Vector3,
-  ) {
-    this.rest = bone.position.clone();
-    // The model's direction in the bone's parent's frame.
-    const toParent = bone.parent!.matrixWorld.clone().invert().multiply(model.matrixWorld);
-    this.dir = dir.clone().applyMatrix4(toParent).sub(new Vector3().applyMatrix4(toParent));
-  }
-
-  set(amount: number) {
-    if (amount === this.last) return;
-    this.last = amount;
-    this.bone.position.copy(this.rest).addScaledVector(this.dir, amount);
-  }
-}
-
-/**
- * The paper's path in the machine's side view, from the roll to well above the bail, as
- * a dense polyline (u toward the typist, v up, metres). It runs from the roll up to the
- * table, down the back of the platen, under it and up its front past the print point,
- * through the bail and out at the exit angle; far enough up it curls back over the machine.
- */
-class Route {
-  readonly ds = 0.004;
-  readonly count: number;
-  readonly length: number;
-  /** Where on the path the print point is (m from the roll). */
-  readonly printAt: number;
-  /** How far the print point is from the path (m): more than a few mm is a modelling slip. */
-  readonly miss: number;
-  /** Where the paper passes the bail (m from the roll): above it the sheet is in the air. */
-  readonly exitAt: number;
-  private p: Float32Array;
-  private t: Float32Array;
-
-  constructor(g: Geometry) {
-    const C = [-g.platenAxis[0], g.platenAxis[1]];
-    const rho = g.platenRadius + 0.0014;
-    const R = [-g.roll[0], g.roll[1]];
-    const T = [-g.table[0], g.table[1]];
-    const B = [-g.bail[0], g.bail[1]];
-    const raw: number[] = [];
-    const add = (u: number, v: number) => raw.push(u, v);
-    const line = (a: number[], b: number[]) => {
-      const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / this.ds));
-      for (let i = 0; i < n; i++)
-        add(a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n);
-    };
-    // The roll, up to its top, and on to the table.
-    const TT = g.tableTop ? [-g.tableTop[0], g.tableTop[1]] : null;
-    if (TT) {
-      line(R, TT);
-      line(TT, T);
-    } else {
-      const top = [R[0], R[1] + g.rollRadius * 0.97];
-      line(R, top);
-      line(top, T);
-    }
-    // The point of the platen where the line from `X` touches it, going round anticlockwise
-    // (down the back, up the front).
-    const touch = (X: number[], leaving: boolean) => {
-      const d = Math.hypot(X[0] - C[0], X[1] - C[1]);
-      const a0 = Math.atan2(X[1] - C[1], X[0] - C[0]);
-      const delta = Math.acos(Math.min(1, rho / d));
-      for (const th of [a0 + delta, a0 - delta]) {
-        const A = [C[0] + rho * Math.cos(th), C[1] + rho * Math.sin(th)];
-        const along = (A[0] - X[0]) * -Math.sin(th) + (A[1] - X[1]) * Math.cos(th);
-        if (leaving ? along < 0 : along > 0) return th;
-      }
-      return a0;
-    };
-    const th0 = touch(T, false);
-    let th1 = touch(B, true);
-    while (th1 < th0) th1 += Math.PI * 2;
-    const at = (th: number) => [C[0] + rho * Math.cos(th), C[1] + rho * Math.sin(th)];
-    const steps = Math.max(2, Math.ceil((rho * (th1 - th0)) / this.ds));
-    for (let i = 0; i < steps; i++)
-      add(...(at(th0 + ((th1 - th0) * i) / steps) as [number, number]));
-    const L = at(th1);
-    line(L, B);
-    add(B[0], B[1]);
-
-    // Evenly spaced along the paper's length, so a line is as tall everywhere on the path.
-    const pts: number[] = [];
-    let carried = 0;
-    pts.push(raw[0], raw[1]);
-    for (let i = 2; i < raw.length; i += 2) {
-      const seg = Math.hypot(raw[i] - raw[i - 2], raw[i + 1] - raw[i - 1]);
-      let used = 0;
-      while (carried + (seg - used) >= this.ds && seg > 0) {
-        used += this.ds - carried;
-        carried = 0;
-        const k = used / seg;
-        pts.push(
-          raw[i - 2] + (raw[i] - raw[i - 2]) * k,
-          raw[i - 1] + (raw[i + 1] - raw[i - 1]) * k,
-        );
-      }
-      carried += seg - used;
-    }
-    // The print point on the path: its nearest vertex.
-    const P = [-g.print[1], g.print[2]];
-    let best = Infinity;
-    let nearest = 0;
-    for (let i = 0; i < pts.length / 2; i++) {
-      const d = Math.hypot(pts[i * 2] - P[0], pts[i * 2 + 1] - P[1]);
-      if (d < best) [best, nearest] = [d, i];
-    }
-    this.printAt = nearest * this.ds;
-    this.miss = best;
-
-    // On through the bail, turning to the exit angle, then curling back over the machine
-    // from the curl line up.
-    const into = Math.atan2(B[1] - L[1], B[0] - L[0]);
-    let turn = Math.atan2(Math.cos(g.exitAngle), -Math.sin(g.exitAngle)) - into;
-    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    const curlFrom = this.printAt + CURL_LINES * TYPE.line;
-    let u = pts[pts.length - 2];
-    let v = pts[pts.length - 1];
-    const start = (pts.length / 2 - 1) * this.ds;
-    this.exitAt = start;
-    for (let s = start; s < curlFrom + CURL_RUN; s += this.ds) {
-      const k = Math.min(1, (s - start) / 0.08);
-      const h = into + turn * k * k * (3 - 2 * k) + Math.max(0, s - curlFrom) * CURL_BEND;
-      u += Math.cos(h) * this.ds;
-      v += Math.sin(h) * this.ds;
-      pts.push(u, v);
-    }
-    this.count = pts.length / 2;
-    this.length = (this.count - 1) * this.ds;
-    this.p = new Float32Array(pts);
-    this.t = new Float32Array(pts.length);
-    for (let i = 0; i < this.count; i++) {
-      const a = Math.max(0, i - 1);
-      const b = Math.min(this.count - 1, i + 1);
-      const du = this.p[b * 2] - this.p[a * 2];
-      const dv = this.p[b * 2 + 1] - this.p[a * 2 + 1];
-      const n = Math.hypot(du, dv) || 1;
-      this.t[i * 2] = du / n;
-      this.t[i * 2 + 1] = dv / n;
-    }
-  }
-
-  /** The path at `s` metres from the roll: position (u, v) and the unit direction of
-   * travel (tu, tv). */
-  at(s: number, out: { u: number; v: number; tu: number; tv: number }) {
-    const x = Math.min(Math.max(s / this.ds, 0), this.count - 1.0001);
-    const i = Math.floor(x);
-    const f = x - i;
-    const { p, t } = this;
-    out.u = p[i * 2] + (p[i * 2 + 2] - p[i * 2]) * f;
-    out.v = p[i * 2 + 1] + (p[i * 2 + 3] - p[i * 2 + 1]) * f;
-    const tu = t[i * 2] + (t[i * 2 + 2] - t[i * 2]) * f;
-    const tv = t[i * 2 + 1] + (t[i * 2 + 3] - t[i * 2 + 1]) * f;
-    const n = Math.hypot(tu, tv) || 1;
-    out.tu = tu / n;
-    out.tv = tv / n;
-  }
-}
-
 /** The keycaps' legends on an 8x8 atlas, in the colours of the look. */
 function legendAtlas(look: LookName, cells: Cell[], old?: CanvasTexture): CanvasTexture {
   const cell = 96;
@@ -484,7 +293,7 @@ function runTime(d: number) {
   return d < reach ? Math.sqrt((2 * d) / RUN_ACCEL) : RUN_MAX / RUN_ACCEL + (d - reach) / RUN_MAX;
 }
 
-export class Typewriter {
+export class Typewriter implements Machine {
   readonly group = new Group();
   readonly ready: Promise<void>;
   readonly paper: Paper;
@@ -629,7 +438,12 @@ export class Typewriter {
     if (opts.layout) this.setLayout(opts.layout);
     this.geo = { ...(SPEC.geometry as Geometry), ...opts.geometry };
     this.x0 = this.geo.paperX?.[0] ?? -MARGIN * TYPE.pitch;
-    this.route = new Route(this.geo);
+    this.route = new Route(this.geo, {
+      line: TYPE.line,
+      curlLines: CURL_LINES,
+      curlBend: CURL_BEND,
+      curlRun: CURL_RUN,
+    });
     if (this.endless) this.rows = Math.ceil(this.route.length / 0.0065);
     this.paper = new Paper(
       {
@@ -1098,6 +912,23 @@ export class Typewriter {
 
   /** The carriage's position along the rail (m, from its rest) now. */
   get carriageX() {
+    return this.carX.y;
+  }
+
+  /** The line being typed: its middle and width (for the stage's close camera). */
+  get lineSpan() {
+    return {
+      x: this.x0 + (MARGIN + TYPE.columns / 2) * TYPE.pitch,
+      width: (TYPE.columns + 2) * TYPE.pitch * 1.04,
+    };
+  }
+
+  get pitch() {
+    return TYPE.pitch;
+  }
+
+  /** The paper rides the carriage. */
+  get shift() {
     return this.carX.y;
   }
 
@@ -1716,217 +1547,8 @@ export class Typewriter {
   }
 }
 
-/** A move of at most `max` toward a gap. */
-function clampStep(gap: number, max: number) {
-  return Math.max(-max, Math.min(max, gap));
-}
-
-// ---- Putting it on a canvas --------------------------------------------------------------
-
-const FOV = 18;
-/** The narrowest a character may be on screen (px) before the camera closes in on the sheet. */
-const MIN_PX = 9;
-/** Camera height over depth (tan of the elevation) on a wide canvas and on a narrow one. */
-const WIDE_TILT = 0.75;
-const NARROW_TILT = 0.4;
-
-/** The machine on a canvas of its own: renderer, lights as on the crew's stage, and a camera
- * that frames the whole machine and its sheet on a wide canvas, and follows the paper closely
- * on a narrow one. */
-export function mountTypewriter(canvas: HTMLCanvasElement, opts: TypewriterOptions) {
-  const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setClearColor(0x000000, 0);
-  const scene = new Scene();
-  const key = new DirectionalLight(0xffffff, 2.4);
-  key.position.set(-0.55, 0.75, 1);
-  const rim = new DirectionalLight(0xffffff, 1.4);
-  rim.position.set(0.5, 0.6, -1);
-  scene.add(new HemisphereLight(0xffffff, 0x9a9a94, 1.9), key, rim);
+/** The machine on a canvas of its own (stage.ts). */
+export function mountTypewriter(canvas: HTMLCanvasElement, opts: TypewriterOptions & StageOptions) {
   const typewriter = new Typewriter(opts);
-  scene.add(typewriter.group);
-  const sounds = new Sounds();
-  sounds.volume = opts.volume ?? 0.7;
-  typewriter.onSound = (e) => sounds.play(e);
-  const camera = new PerspectiveCamera(FOV, 1, 0.05, 40);
-  typewriter.camera = camera;
-
-  // The camera's goal: a point to look at and how far back to stand.
-  const aim = new Vector3();
-  const goal = new Vector3();
-  const here = new Vector3();
-  const dir = new Vector3();
-  const corner = new Vector3();
-  const box = new Box3();
-  const right = new Vector3();
-  const upc = new Vector3();
-  let dist = 3;
-  let follow = false;
-  let ready = false;
-  let width = 1;
-  let height = 1;
-
-  /** How far back (along `dir`) the box fits the view, looking at its middle. */
-  const fit = (b: Box3, centre: Vector3) => {
-    const tanY = Math.tan((FOV / 2) * (Math.PI / 180));
-    const tanX = tanY * camera.aspect;
-    right.crossVectors(dir.clone().negate(), camera.up).normalize();
-    upc.crossVectors(right, dir.clone().negate());
-    let d = 0;
-    for (let i = 0; i < 8; i++) {
-      corner
-        .set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z)
-        .sub(centre);
-      d = Math.max(
-        d,
-        corner.dot(dir) +
-          Math.max(Math.abs(corner.dot(right)) / tanX, Math.abs(corner.dot(upc)) / tanY),
-      );
-    }
-    return d;
-  };
-
-  const frame = () => {
-    if (!ready) return;
-    const tanY = Math.tan((FOV / 2) * (Math.PI / 180));
-    const wideFrame = () => {
-      // The whole machine, feet to the top of the sheet, seen from above and in front the way
-      // a typist sees it: the print line is clear of the platen and the lines above it read.
-      box.copy(typewriter.bounds);
-      box.getCenter(aim);
-      dist = 0;
-      dir.set(0.06, WIDE_TILT, 1).normalize();
-      dist = fit(box, aim);
-    };
-    wideFrame();
-    // Pixels across one character: the paper has to stay readable. Too small, and the
-    // camera closes in on the paper just enough, turning down to it as it comes; on a narrow
-    // canvas it comes all the way, the paper filling the width, and follows the carriage.
-    const wide = dist;
-    const px = (height / (2 * wide * tanY)) * TYPE.pitch;
-    follow = false;
-    if (px < MIN_PX) {
-      const p = typewriter.printPoint;
-      const w = (TYPE.columns + 2) * TYPE.pitch * 1.04;
-      const cx = typewriter.x0 + (MARGIN + TYPE.columns / 2) * TYPE.pitch;
-      dir.set(0, NARROW_TILT, 1).normalize();
-      box.min.set(cx - w / 2, p.y - 0.01, p.z - 0.01);
-      box.max.set(cx + w / 2, p.y + 0.01, p.z + 0.01);
-      const paper = fit(box, corner.set(cx, p.y, p.z));
-      const need = (height * TYPE.pitch) / (2 * tanY * MIN_PX);
-      dist = Math.max(need, paper);
-      // How far in it has come: 0 the whole machine, 1 the paper alone.
-      const k = Math.min(1, Math.max(0, (wide - dist) / Math.max(1e-6, wide - paper)));
-      dir.set(0.06 * (1 - k), WIDE_TILT + (NARROW_TILT - WIDE_TILT) * k, 1).normalize();
-      const machine = typewriter.bounds.getCenter(corner);
-      const visible = 2 * dist * tanY;
-      aim.set(
-        machine.x + (cx - machine.x) * k,
-        machine.y + (p.y + visible * 0.16 - machine.y) * Math.min(1, k * 1.6),
-        machine.z + (p.z - machine.z) * Math.min(1, k * 1.6),
-      );
-      follow = k > 0.5;
-    }
-    camera.near = dist * 0.05;
-    camera.far = dist * 20;
-    camera.updateProjectionMatrix();
-  };
-
-  const resize = () => {
-    width = Math.max(1, canvas.clientWidth);
-    height = Math.max(1, canvas.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(dpr);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    outlineUniforms.viewport.value.set(width * dpr, height * dpr);
-    outlineUniforms.outlinePx.value = 1.1 * dpr;
-    frame();
-    if (ready) snap();
-  };
-
-  const place = (k: number) => {
-    goal.copy(aim);
-    if (follow) goal.x += typewriter.carriageX;
-    here.lerp(goal, k);
-    camera.position.copy(here).addScaledVector(dir, dist);
-    camera.lookAt(here);
-  };
-  const snap = () => place(1);
-
-  typewriter.ready.then(() => {
-    ready = true;
-    frame();
-    snap();
-  });
-
-  const ro = new ResizeObserver(resize);
-  ro.observe(canvas);
-  resize();
-
-  let running = false;
-  let visible = true;
-  let raf = 0;
-  let last = 0;
-  const loop = (time: number) => {
-    raf = 0;
-    if (!running) return;
-    const dt = last ? (time - last) / 1000 : 0.016;
-    last = time;
-    typewriter.update(dt);
-    // The narrow camera stays on the sheet, which rides the carriage: follow it smoothly.
-    if (ready) {
-      place(typewriter.reducedMotion ? 1 : 1 - Math.exp(-dt * 5));
-    }
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(loop);
-  };
-  const wake = () => {
-    const should = running && visible && !document.hidden;
-    if (should && !raf) {
-      last = 0;
-      raf = requestAnimationFrame(loop);
-    } else if (!should && raf) {
-      cancelAnimationFrame(raf);
-      raf = 0;
-    }
-  };
-  const io = new IntersectionObserver((entries) => {
-    visible = entries.some((e) => e.isIntersecting);
-    wake();
-  });
-  io.observe(canvas);
-  document.addEventListener('visibilitychange', wake);
-
-  return {
-    typewriter,
-    camera,
-    renderer,
-    sounds,
-    /** A pointer event's position as NDC on this canvas. */
-    ndc(e: { clientX: number; clientY: number }) {
-      const r = canvas.getBoundingClientRect();
-      return {
-        x: ((e.clientX - r.left) / r.width) * 2 - 1,
-        y: -(((e.clientY - r.top) / r.height) * 2 - 1),
-      };
-    },
-    start() {
-      running = true;
-      wake();
-    },
-    stop() {
-      running = false;
-      wake();
-    },
-    dispose() {
-      running = false;
-      wake();
-      ro.disconnect();
-      io.disconnect();
-      document.removeEventListener('visibilitychange', wake);
-      typewriter.dispose();
-      sounds.dispose();
-      renderer.dispose();
-    },
-  };
+  return { typewriter, ...mountStage(canvas, typewriter, opts) };
 }

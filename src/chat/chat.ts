@@ -1,5 +1,6 @@
 import type { LookName } from '../typewriter/looks';
 import type { Flag, Typewriter } from '../typewriter/typewriter';
+import { split } from '../typewriter/layouts';
 import { Link } from './link';
 import { Printer } from './printer';
 import { type Line, LIMITS, type Person, type ServerMessage } from './protocol';
@@ -13,8 +14,10 @@ import SPEC from '../typewriter/typewriter.json';
  * place in line; bordeaux, someone else is typing and you aren't in line; down, nobody is
  * typing.
  *
- * You type into a field kept out of sight on the machine (so a phone's keyboard and input
- * methods work), or click the machine's keys. The markup is chat.astro's.
+ * You just type: if the line is free it's yours at once, and if it's busy you join the line and
+ * what you type waits (the draft) until your turn, when it goes out. You type into a field kept
+ * out of sight on the machine (so a phone's keyboard and input methods work), or click the
+ * machine's keys. The markup is chat.astro's.
  */
 
 const FLAGS = {
@@ -49,6 +52,8 @@ export interface ChatView {
   place: number;
   /** The line is yours. */
   mine: boolean;
+  /** What you've typed while waiting your turn: it goes out when the line is yours. */
+  draft: string;
 }
 
 export function setUpChat(root: HTMLElement, opts: ChatOptions) {
@@ -70,6 +75,7 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     line: { floor: null, queue: [], until: null },
     place: 0,
     mine: false,
+    draft: '',
   };
   let shifted: string | null = null;
 
@@ -133,6 +139,9 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
         tw!.ribbon(m.you.ink);
         p.history(m.history);
         if (m.current) p.begin(m.current, true);
+        // Back after a drop with something still to say: back in line.
+        if (view.draft && !m.line.queue.includes(m.you.id) && m.line.floor !== m.you.id)
+          link.send({ t: 'hold' });
         break;
       case 'people':
         view.people = m.people;
@@ -145,6 +154,10 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
         if (m.turn.id === view.me?.id) {
           tw!.mood('happy');
           field.focus({ preventScroll: true });
+          // What you typed while you waited goes out now.
+          const draft = view.draft;
+          view.draft = '';
+          if (draft) send(draft);
         } else tw!.ding();
         break;
       case 'type':
@@ -189,19 +202,29 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
 
   // ---------- Typing ----------
 
-  /** You typed: on your paper at once, and out to the room. */
+  /** You typed: on your paper at once and out to the room, when the line is yours; else into
+   * the draft, and into line if you aren't already. */
   function type(s: string) {
-    if (!view.mine || !printer || !s) {
-      if (s && tw) tw.mood('puzzled');
-      return;
-    }
-    printer.type(s);
+    if (!s || !printer) return;
+    if (view.mine) return send(s);
+    if (view.state !== 'open') return void tw?.mood('puzzled');
+    view.draft = (view.draft + s).slice(0, LIMITS.turn);
+    if (!view.place) link.send({ t: 'hold' });
+    tell();
+  }
+
+  function send(s: string) {
+    printer!.type(s);
     for (let i = 0; i < s.length; i += LIMITS.chunk) link.send({ t: 'type', s: s.slice(i, i + LIMITS.chunk) });
     caret();
   }
 
   function back() {
-    if (!view.mine || !printer) return;
+    if (!printer) return;
+    if (!view.mine) {
+      view.draft = split(view.draft).slice(0, -1).join('');
+      return tell();
+    }
     printer.back();
     link.send({ t: 'back' });
     caret();
@@ -292,8 +315,11 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     link.send({ t: 'hold' });
     field.focus({ preventScroll: true });
   }
+  /** Out of line, and the draft with you. */
   function leave() {
+    view.draft = '';
     link.send({ t: 'leave' });
+    tell();
   }
   function over() {
     link.send({ t: 'over' });

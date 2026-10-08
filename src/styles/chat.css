@@ -234,3 +234,15 @@ aside legend {
   font-size: var(--text-sm);
   color: var(--ink-faint);
 }
+
+.chat .draft {
+  margin: 0.5rem 0 0;
+  padding: 0.25rem 0 0.25rem 0.6rem;
+  border-left: 3px solid var(--ink);
+  max-height: 8rem;
+  overflow: auto;
+  font: var(--text-sm) / 1.4 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}

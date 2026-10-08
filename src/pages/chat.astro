@@ -57,6 +57,7 @@ const DECOR = [
         <aside>
           <section class="line" aria-live="polite">
             <p class="status" data-status></p>
+            <p class="draft" data-draft hidden></p>
             <div class="buttons">
               <button type="button" data-action="hold">Hold the line</button>
               <button type="button" data-action="leave" hidden>Leave the line</button>
@@ -166,6 +167,7 @@ const DECOR = [
 
       const status = document.querySelector<HTMLElement>('[data-status]')!;
       const list = document.querySelector<HTMLUListElement>('[data-people]')!;
+      const draft = document.querySelector<HTMLElement>('[data-draft]')!;
       const button = (a: string) => document.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
 
       function show(v: ChatView) {
@@ -180,10 +182,13 @@ const DECOR = [
                 ? `You're ${v.place === 1 ? 'next' : `number ${v.place}`} in line.`
                 : v.line.floor
                   ? `${name(v.line.floor)} is typing.`
-                  : 'Nobody is typing.';
+                  : 'The line is free: type.';
         button('hold').hidden = v.mine || !!v.place;
         button('leave').hidden = !v.place;
         button('over').hidden = !v.mine;
+        draft.hidden = !v.draft;
+        draft.textContent = v.draft;
+        draft.style.setProperty('--ink', v.me?.ink ?? 'currentColor');
         list.replaceChildren(
           ...v.people.map((p) => {
             const li = document.createElement('li');
@@ -270,6 +275,12 @@ const DECOR = [
         keep();
       });
       dark.addEventListener('change', () => chat?.relook());
+      // Typing anywhere on the page (but in the page's own fields) types on the machine.
+      document.addEventListener('keydown', (e) => {
+        const t = e.target as HTMLElement;
+        if (!chat || e.metaKey || e.ctrlKey || t.closest('input, textarea, select, dialog')) return;
+        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') chat.focus();
+      });
     </script>
   </body>
 </html>

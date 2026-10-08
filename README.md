@@ -40,8 +40,9 @@ room is in the link (`/chat/?room=…`), so you share a room by sharing the addr
 holds the line and types at a time; everyone else sees every character land on their own
 paper as it is typed, each typist in their own ink, with their name in front.
 
-To type, ask to hold the line. You go to the back of the queue, and the flag on the side of
-your machine says where you stand:
+Just type. If the line is free it's yours at once; if someone else holds it, you join the
+queue and what you type waits under the room's status until your turn, when it goes out. The
+flag on the side of your machine says where you stand:
 
 - **Green**: the line is yours. Type. *Over* (or Escape) hands it on.
 - **Yellow with a number**: your place in line.
