@@ -146,7 +146,8 @@ import '../styles/teleprinter.css';
         }
       });
       textField.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        // A phone's Return is a new line: it sends with the button.
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !matchMedia('(pointer: coarse)').matches) {
           e.preventDefault();
           send.requestSubmit();
         }

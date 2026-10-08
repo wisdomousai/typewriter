@@ -31,6 +31,9 @@ const FLAGS = {
 /** A sentinel in the field, so taking a character back always has something to take. */
 const SENTINEL = ' ';
 
+/** A touch screen's keyboard (a phone's), whose Return can't be Shift Return. */
+export const TOUCH = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)') : null;
+
 export interface ChatOptions {
   /** The room's WebSocket address. */
   url: string;
@@ -281,7 +284,9 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     'keydown',
     (e) => {
       // Enter (or Escape) hands the line on, or finishes the draft; Shift Enter is a new line.
-      if ((e.key === 'Enter' && !e.shiftKey && !e.isComposing) || (e.key === 'Escape' && view.mine)) {
+      // A phone has no Shift Enter: its Return is a new line, and Over is a button.
+      const newLine = e.shiftKey || !!TOUCH?.matches;
+      if ((e.key === 'Enter' && !newLine && !e.isComposing) || (e.key === 'Escape' && view.mine)) {
         e.preventDefault();
         enter();
       }
@@ -383,6 +388,8 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     hold,
     leave,
     over,
+    /** Done: the line on, or the draft finished (Enter). */
+    enter,
     /** Type into the chat (as if from the keyboard). */
     focus() {
       field.focus({ preventScroll: true });

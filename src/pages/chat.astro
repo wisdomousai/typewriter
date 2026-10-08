@@ -123,7 +123,7 @@ const DECOR = [
     </main>
 
     <script>
-      import { setUpChat, type ChatView } from '../chat/chat';
+      import { setUpChat, TOUCH, type ChatView } from '../chat/chat';
       import { forgetPass, getPass, storedPass } from '../chat/pass';
       import { ROOM } from '../chat/protocol';
       import type { LookName } from '../typewriter/looks';
@@ -174,6 +174,9 @@ const DECOR = [
       const draft = document.querySelector<HTMLElement>('[data-draft]')!;
       const button = (a: string) => document.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
 
+      /** How you say you're done: Enter on a keyboard, Over on a phone. */
+      const done = TOUCH?.matches ? 'Over' : 'Enter';
+
       function show(v: ChatView) {
         // Let go for good: out of date passes do the check again; the rest can come back in.
         if (v.ended === 'pass') return void setTimeout(again);
@@ -184,10 +187,10 @@ const DECOR = [
           : v.state !== 'open'
             ? 'Connecting…'
             : v.mine
-              ? 'The line is yours: type, and Enter when you’re done.'
+              ? `The line is yours: type, and ${done} when you’re done.`
               : v.place
                 ? `You're ${v.place === 1 ? 'next' : `number ${v.place}`} in line.` +
-                  (v.done ? ' Yours goes out then.' : v.draft ? ' Enter when it’s finished.' : '')
+                  (v.done ? ' Yours goes out then.' : v.draft ? ` ${done} when it’s finished.` : '')
                 : v.line.floor
                   ? `${name(v.line.floor)} is typing.`
                   : 'The line is free: type.';
@@ -195,7 +198,9 @@ const DECOR = [
         button('again').hidden = !v.ended;
         button('hold').hidden = v.mine || !!v.place || !!v.ended;
         button('leave').hidden = !v.place;
-        button('over').hidden = !v.mine;
+        // Over hands the line on, or (waiting) finishes the draft: Enter does the same on a
+        // keyboard, but a phone's Return is a new line.
+        button('over').hidden = !v.mine && !(v.place && v.draft && !v.done);
         draft.hidden = !v.draft;
         draft.textContent = v.draft;
         draft.style.setProperty('--ink', v.me?.ink ?? 'currentColor');
@@ -275,7 +280,7 @@ const DECOR = [
 
       button('hold').addEventListener('click', () => chat?.hold());
       button('leave').addEventListener('click', () => chat?.leave());
-      button('over').addEventListener('click', () => chat?.over());
+      button('over').addEventListener('click', () => chat?.enter());
       button('again').addEventListener('click', again);
       button('copy').addEventListener('click', async () => {
         try {

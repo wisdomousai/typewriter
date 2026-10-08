@@ -37,6 +37,9 @@ export interface Machine {
 export interface StageOptions {
   /** Its sounds' volume, 0 (silent) to 1. */
   volume?: number;
+  /** Close in on the paper when the type would be too small to read (off: the whole machine,
+   * however small the canvas). */
+  closeUp?: boolean;
 }
 
 const FOV = 18;
@@ -47,7 +50,7 @@ const WIDE_TILT = 0.75;
 const NARROW_TILT = 0.4;
 
 /** A machine on a canvas of its own: renderer, lights as on the crew's stage, and a camera
- * that frames the whole machine and its paper on a wide canvas, and closes in on the line being
+ * that frames the whole machine and its paper, and (with `closeUp`) closes in on the line being
  * typed (following the paper, if it slides) when the type would be too small to read. */
 export function mountStage(canvas: HTMLCanvasElement, machine: Machine, opts: StageOptions = {}) {
   const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
@@ -115,7 +118,7 @@ export function mountStage(canvas: HTMLCanvasElement, machine: Machine, opts: St
     const wide = dist;
     const px = (height / (2 * wide * tanY)) * machine.pitch;
     follow = false;
-    if (px < MIN_PX) {
+    if (opts.closeUp && px < MIN_PX) {
       const p = machine.printPoint;
       const { x: cx, width: w } = machine.lineSpan;
       dir.set(0, NARROW_TILT, 1).normalize();

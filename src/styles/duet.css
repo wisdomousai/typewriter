@@ -29,12 +29,10 @@
   color: var(--ink);
 }
 
-/* Stacked on a phone: both machines short enough to stay in sight over the keyboard. */
+/* Stacked on a phone: each machine as wide as the screen. */
 @media (max-width: 55.99rem) {
   .duet .stage {
-    aspect-ratio: auto;
-    height: 30svh;
-    min-height: 11rem;
+    aspect-ratio: 1 / 1;
   }
   .duet .status {
     padding-top: 0.3rem;
