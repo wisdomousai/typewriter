@@ -60,6 +60,13 @@ export function setUpDesk(desk: HTMLElement, opts: DeskOptions) {
     top: Number(el.dataset.top),
     lines: Number(el.dataset.lines),
   }));
+  // On endless paper the last field runs on as far as it likes.
+  const end = fields[fields.length - 1];
+  end.el.dataset.maxlength ??= end.el.getAttribute('maxlength') ?? '';
+  if (opts.endless) {
+    end.lines = Infinity;
+    end.el.removeAttribute('maxlength');
+  } else if (end.el.dataset.maxlength) end.el.setAttribute('maxlength', end.el.dataset.maxlength);
   const still = matchMedia('(prefers-reduced-motion: reduce)');
   const off = new AbortController();
   const { signal } = off;
@@ -317,7 +324,7 @@ export function setUpDesk(desk: HTMLElement, opts: DeskOptions) {
       if (!tw) return;
       tw.paper.flush();
       const blob = await new Promise<Blob | null>((done) =>
-        tw!.paper.canvas.toBlob(done, 'image/png'),
+        tw!.paper.picture().toBlob(done, 'image/png'),
       );
       if (!blob) return;
       const a = document.createElement('a');

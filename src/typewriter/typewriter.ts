@@ -64,6 +64,8 @@ export interface TypewriterOptions {
   /** Its sounds' volume, 0 (silent) to 1 (mountTypewriter only). */
   volume?: number;
   reducedMotion?: boolean;
+  /** Endless paper off a roll, rather than sheets. */
+  endless?: boolean;
   /** A model to work instead of loading typewriter.glb, and a geometry block to use with
    * it (the lab's stand-in). */
   model?: Object3D | Promise<Object3D>;
@@ -120,6 +122,8 @@ const BOTTOM_LINES = 3;
 const SHEET_COLUMNS = Math.round(TYPE.paperWidth / TYPE.pitch);
 const SHEET_LENGTH = (TOP_LINES + LINES + BOTTOM_LINES) * TYPE.line;
 const ROWS = Math.ceil(SHEET_LENGTH / 0.0065);
+/** Endless paper: the lines it keeps (the paper's picture repeats every this many). */
+const RING = 88;
 /** Lines of free paper above the print point before its end curls back over the machine. */
 const CURL_LINES = 9;
 /** The curl's bend (rad per m) and how far on the path runs before it ends: old lines fold up
@@ -415,6 +419,7 @@ interface Bar {
   peak: number;
   ch: string;
   at: Spot;
+  ink?: string;
 }
 
 interface Key {
@@ -425,10 +430,10 @@ interface Key {
 }
 
 type Job =
-  | { kind: 'strike'; ch: string; at: Spot }
+  | { kind: 'strike'; ch: string; at: Spot; ink?: string }
   | { kind: 'erase'; at: Spot }
   | { kind: 'move'; at: Spot }
-  | { kind: 'put'; at: Spot; ch: string | null }
+  | { kind: 'put'; at: Spot; ch: string | null; ink?: string }
   | { kind: 'ding' }
   | { kind: 'send'; done: () => void };
 
@@ -445,6 +450,18 @@ interface Flyer {
 
 /** The light on the page would blow white paper out: a touch of grey keeps the type's tones. */
 const PAPER_TINT = '#e6e6e2';
+/** How far the flag turns back to lie down (rad). */
+const FLAG_DOWN = Math.PI / 2;
+/** And how far its plate turns about the arm, to lie along the side (rad). */
+const PLATE_TURN = -Math.PI / 2;
+
+/** A raised flag: its colour, and a number or a word on it in its ink. */
+export interface Flag {
+  colour: string;
+  label?: string;
+  ink?: string;
+}
+
 /** The typebars' length (m), for how much further they swing with the basket dropped. */
 const BAR_LENGTH = 0.3;
 const JOB_GAP = 0.105;
@@ -479,6 +496,9 @@ export class Typewriter {
   camera: Camera | null = null;
   /** The whole machine (and the paper to the curl line) in the group's space, once loaded. */
   readonly bounds = new Box3();
+  /** Endless paper off a roll (else sheets), and the strip's rows along the paper's path. */
+  readonly endless: boolean;
+  private rows = ROWS;
   /** The print point in the group's space. */
   readonly printPoint = new Vector3();
   private geo: Geometry;
@@ -513,6 +533,20 @@ export class Typewriter {
   private lever: Hinge | null = null;
   private bell: Hinge | null = null;
   private needle: Hinge | null = null;
+  // The flag on the side: up (with its colour and its number) or down, and its springs.
+  private flagHinge: Hinge | null = null;
+  private flagS = new Spring(7, 0.45, -FLAG_DOWN);
+  private flagPlate: Hinge | null = null;
+  private plateS = new Spring(9, 0.6, PLATE_TURN);
+  private flagUp: Flag | null = null;
+  private flagMat: MeshStandardMaterial | null = null;
+  private flagTex: CanvasTexture | null = null;
+  private decorBones = new Map<string, Object3D>();
+  private decorOn: string[] | null = null;
+  private ribbonMat: MeshStandardMaterial | null = null;
+  private ribbonInk: string | null = null;
+  /** The colour look's palette (palettes.json): the machine's own, or one of its variants. */
+  private palette = 'typewriter';
   private spools: Hinge[] = [];
 
   // Springs. The carriage's is stiff and a little lively: an escapement step is a snap
@@ -588,6 +622,7 @@ export class Typewriter {
 
   constructor(opts: TypewriterOptions) {
     this.reducedMotion = !!opts.reducedMotion;
+    this.endless = !!opts.endless;
     this.look_ = opts.look ?? 'ink';
     this.layout_ = LAYOUTS['us-qwerty'];
     ({ cells: this.cells, chars: this.chars } = keyboard(this.layout_));
@@ -595,6 +630,7 @@ export class Typewriter {
     this.geo = { ...(SPEC.geometry as Geometry), ...opts.geometry };
     this.x0 = this.geo.paperX?.[0] ?? -MARGIN * TYPE.pitch;
     this.route = new Route(this.geo);
+    if (this.endless) this.rows = Math.ceil(this.route.length / 0.0065);
     this.paper = new Paper(
       {
         columns: TYPE.columns,
@@ -602,6 +638,7 @@ export class Typewriter {
         sheetColumns: SHEET_COLUMNS,
         topLines: TOP_LINES,
         bottomLines: BOTTOM_LINES,
+        ring: this.endless ? RING : 0,
       },
       TYPE.line / TYPE.pitch,
     );
@@ -670,6 +707,12 @@ export class Typewriter {
     this.lever = hinge('lever');
     this.bell = hinge('bell');
     this.needle = hinge('needle');
+    this.flagHinge = hinge('flag');
+    this.flagPlate = hinge('flagPlate', Y);
+    model.traverse((o) => {
+      if (o.name.startsWith('decor_')) this.decorBones.set(o.name.slice(6), o);
+    });
+    this.decor(this.decorOn ?? []);
     this.spools = ['spoolL', 'spoolR'].map((n) => hinge(n, Y)).filter((h): h is Hinge => !!h);
     const shoot = new Vector3();
     for (const [id, bar] of this.bars) bar.hinge = hinge(`bar_${id}`);
@@ -709,6 +752,7 @@ export class Typewriter {
 
   /** The feed that has the sheet just off the roll (nothing of it showing). */
   private startFeed() {
+    if (this.endless) return 0;
     return -(this.route.printAt / TYPE.line + TOP_LINES + 1);
   }
 
@@ -752,7 +796,7 @@ export class Typewriter {
     const model = this.model;
     if (!model) return;
     this.outfit?.dispose();
-    this.outfit = dress(model, look, { screen: this.face.texture, model: 'typewriter' });
+    this.outfit = dress(model, look, { screen: this.face.texture, model: this.palette });
     this.face.setGlow(glowColour.value ?? '#f4f4f1');
     // The keycaps carry their legends: their own material, swapped in after the dressing.
     this.legend = legendAtlas(look, this.cells, this.legend ?? undefined);
@@ -762,6 +806,10 @@ export class Typewriter {
     // The paper roll is paper, not a lamp.
     this.rollMat ??= new MeshStandardMaterial({ color: PAPER_TINT, roughness: 0.95 });
     for (const m of this.meshes('Glow_Paper')) m.material = this.rollMat;
+    this.flagMat ??= new MeshStandardMaterial({ roughness: 0.7 });
+    this.paintFlag();
+    for (const m of this.meshes('Flag')) m.material = this.flagMat;
+    if (this.ribbonInk) this.ribbon(this.ribbonInk);
     document.fonts
       ?.load('40px "Maple Mono"')
       .then(() => this.legend && legendAtlas(this.look_, this.cells, this.legend))
@@ -772,24 +820,25 @@ export class Typewriter {
   /** Cut it to these planes (as it comes up through a hole in the floor), or not (null). */
   clip(planes: Plane[] | null) {
     this.planes = planes;
-    const own = [this.legendMat, this.rollMat, this.frontMat, this.backMat];
+    const own = [this.legendMat, this.rollMat, this.flagMat, this.ribbonMat, this.frontMat, this.backMat];
     for (const m of [...(this.outfit?.materials ?? []), ...own]) if (m) m.clippingPlanes = planes;
   }
 
   /** The sheet's two meshes (the typed side, and its back) on one strip of vertices. */
   private buildSheet() {
     const geometry = (this.geometry = new BufferGeometry());
-    const n = ROWS * 2;
+    const rows = this.rows;
+    const n = rows * 2;
     geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(n * 3), 3));
     geometry.setAttribute('normal', new Float32BufferAttribute(new Float32Array(n * 3), 3));
     const uv = new Float32Array(n * 2);
-    for (let j = 0; j < ROWS; j++) {
-      const v = j / (ROWS - 1);
+    for (let j = 0; j < rows; j++) {
+      const v = j / (rows - 1);
       uv.set([0, v, 1, v], j * 4);
     }
     geometry.setAttribute('uv', new Float32BufferAttribute(uv, 2));
     const index: number[] = [];
-    for (let j = 0; j < ROWS - 1; j++) {
+    for (let j = 0; j < rows - 1; j++) {
       const a = j * 2;
       index.push(a, a + 2, a + 3, a, a + 3, a + 1);
     }
@@ -824,8 +873,19 @@ export class Typewriter {
     const s = this.sample;
     const x0 = this.x0;
     const x1 = x0 + TYPE.paperWidth;
-    for (let j = 0; j < ROWS; j++) {
-      r.at(Math.max(floor, sTop - (j / (ROWS - 1)) * SHEET_LENGTH), s);
+    const rows = this.rows;
+    // Endless paper lies along the whole path, and its picture slides through it instead.
+    const uv = this.endless ? (geometry.getAttribute('uv') as BufferAttribute) : null;
+    for (let j = 0; j < rows; j++) {
+      const along = uv
+        ? r.length * (1 - j / (rows - 1))
+        : sTop - (j / (rows - 1)) * SHEET_LENGTH;
+      if (uv) {
+        const v = (feed + 0.5 + (r.printAt - along) / TYPE.line) / RING;
+        uv.setY(j * 2, v);
+        uv.setY(j * 2 + 1, v);
+      }
+      r.at(Math.max(floor, along), s);
       // The typed side faces out from the platen: to the right of the way the paper runs.
       pos.setXYZ(j * 2, x0, s.v, s.u);
       pos.setXYZ(j * 2 + 1, x1, s.v, s.u);
@@ -833,9 +893,71 @@ export class Typewriter {
       nor.setXYZ(j * 2 + 1, 0, -s.tu, s.tv);
     }
     pos.needsUpdate = nor.needsUpdate = true;
+    if (uv) uv.needsUpdate = true;
   }
 
   // ---- What the page asks for ----------------------------------------------------------
+
+  /** Raise the flag in a colour, with a number or a word on it, or lower it (null). */
+  flag(up: Flag | null) {
+    const was = this.flagUp;
+    if (was?.colour === up?.colour && was?.label === up?.label) return;
+    this.flagUp = up;
+    if (up) this.paintFlag();
+    if (!!was !== !!up) this.sound(up ? 'lever' : 'shift', 0.6, 0.8);
+    else this.flagS.kick(-3);
+  }
+
+  private paintFlag() {
+    const up = this.flagUp;
+    if (!this.flagMat) return;
+    const canvas = (this.flagTex?.image as HTMLCanvasElement) ?? document.createElement('canvas');
+    canvas.width = 192;
+    canvas.height = 128;
+    const c = canvas.getContext('2d')!;
+    c.fillStyle = up?.colour ?? '#7a7a74';
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    if (up?.label) {
+      c.fillStyle = up.ink ?? '#111111';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `700 ${up.label.length > 2 ? 54 : 92}px "Maple Mono", ui-monospace, monospace`;
+      c.fillText(up.label, canvas.width / 2, canvas.height / 2 + 6, canvas.width * 0.86);
+    }
+    if (!this.flagTex) {
+      this.flagTex = new CanvasTexture(canvas);
+      this.flagTex.colorSpace = SRGBColorSpace;
+      this.flagTex.flipY = false;
+      this.flagMat.map = this.flagTex;
+      this.flagMat.needsUpdate = true;
+    }
+    this.flagTex.needsUpdate = true;
+  }
+
+  /** Which decor the machine wears (antenna, stickers, horn, lamp): the rest is left off. */
+  decor(names: string[]) {
+    this.decorOn = names;
+    for (const [name, bone] of this.decorBones) bone.scale.setScalar(names.includes(name) ? 1 : 1e-4);
+  }
+
+  /** The colour look's palette: the machine's own ('typewriter') or a variant's. */
+  repaint(palette: string) {
+    this.palette = palette;
+    this.dress(this.look_);
+  }
+
+  /** The ribbon's colour (its lower half), or the look's again (null). */
+  ribbon(ink: string | null) {
+    const was = this.ribbonInk;
+    this.ribbonInk = ink;
+    if (!ink) {
+      if (was) this.dress(this.look_);
+      return;
+    }
+    this.ribbonMat ??= new MeshStandardMaterial({ roughness: 0.55 });
+    this.ribbonMat.color.set(ink);
+    for (const m of this.meshes('Bezel_Ribbon')) m.material = this.ribbonMat;
+  }
 
   /** What the keys type now. */
   get layout(): Layout {
@@ -858,8 +980,9 @@ export class Typewriter {
     return { id: BAR_IDS[h % BAR_IDS.length], mod: 0 };
   }
 
-  strike(ch: string, at: Spot) {
-    this.jobs.push({ kind: 'strike', ch, at });
+  /** Queued: a character struck at a spot, in the machine's ink or another ribbon's. */
+  strike(ch: string, at: Spot, ink?: string) {
+    this.jobs.push({ kind: 'strike', ch, at, ink });
   }
 
   erase(at: Spot) {
@@ -877,8 +1000,8 @@ export class Typewriter {
   /** Queued: set a spot to a character, or clear it (null), at once and without the
    * machine, when the queue gets there; so it can't be struck over by a strike queued
    * before it. For text the page moves in bulk. */
-  put(at: Spot, ch: string | null) {
-    this.jobs.push({ kind: 'put', at, ch });
+  put(at: Spot, ch: string | null, ink?: string) {
+    this.jobs.push({ kind: 'put', at, ch, ink });
   }
 
   send(): Promise<void> {
@@ -906,11 +1029,14 @@ export class Typewriter {
     const hit = this.ray.intersectObject(this.front, false)[0];
     if (!hit?.uv) return null;
     const col = Math.floor((hit.uv.x * TYPE.paperWidth) / TYPE.pitch - MARGIN);
-    const line = Math.floor(hit.uv.y * (SHEET_LENGTH / TYPE.line) - TOP_LINES);
-    if (col < -2 || col > TYPE.columns + 1 || line < -1 || line > LINES) return null;
+    const line = this.endless
+      ? Math.floor(hit.uv.y * RING)
+      : Math.floor(hit.uv.y * (SHEET_LENGTH / TYPE.line) - TOP_LINES);
+    const last = this.endless ? Infinity : LINES - 1;
+    if (col < -2 || col > TYPE.columns + 1 || line < -1 || line > last + 1) return null;
     return {
       col: Math.min(Math.max(col, 0), TYPE.columns - 1),
-      line: Math.min(Math.max(line, 0), LINES - 1),
+      line: Math.min(Math.max(line, 0), last),
     };
   }
 
@@ -991,7 +1117,9 @@ export class Typewriter {
     const dc = col - this.tCol;
     const dl = line - this.tLine;
     this.tCol = Math.min(Math.max(col, 0), TYPE.columns);
-    this.tLine = Math.min(Math.max(line, 0), LINES - 1);
+    this.tLine = Math.min(Math.max(line, 0), this.endless ? Infinity : LINES - 1);
+    // Blank paper ready below the line, up from the roll.
+    this.paper.reserve(this.tLine + Math.ceil(this.route.printAt / TYPE.line) + 2);
     this.serial++;
     let seconds = 0;
     if (Math.abs(dc) > 5) {
@@ -1062,6 +1190,7 @@ export class Typewriter {
         else {
           const bar = this.bars.get(info.id)!;
           if (bar.state === 1) this.land(bar.ch, bar.at, bar);
+          bar.ink = job.ink;
           bar.state = 1;
           bar.t = -wait + late;
           bar.dur = 0.07 / speed;
@@ -1102,7 +1231,7 @@ export class Typewriter {
         }
         if (this.tapeRun?.at.line === at.line && this.tapeRun.at.col === at.col) this.finishTape();
         this.paper.clear(at, false);
-        if (ch !== null) this.paper.text(at, ch);
+        if (ch !== null) this.paper.text(at, ch, job.ink);
         return 0;
       }
       case 'ding':
@@ -1129,7 +1258,7 @@ export class Typewriter {
   }
 
   private land(ch: string, at: Spot, bar?: Bar) {
-    this.paper.print(ch, at);
+    this.paper.print(ch, at, bar?.ink);
     if (bar) this.inflight--;
     this.spoolAngle += 0.35;
     this.needleS.kick(-0.4);
@@ -1409,6 +1538,10 @@ export class Typewriter {
     const breath = still ? 0 : wobble(t * 0.35, 4) * 0.1;
     const level = 0.62 + breath + this.spring(this.needleS, dt, 0) * 0.25;
     this.needle?.set(lo + (hi - lo) * level);
+    // The flag: raised or lowered with a bounce, and stirring a little while it's up.
+    const flutter = this.flagUp && !still ? wobble(t * 1.7, 9) * 0.03 : 0;
+    this.flagHinge?.set(this.spring(this.flagS, dt, this.flagUp ? 0 : -FLAG_DOWN) + flutter);
+    this.flagPlate?.set(this.spring(this.plateS, dt, this.flagUp ? 0 : PLATE_TURN));
     const o = this.outfit;
     if (o) {
       const busy = t - this.lastStrike < 0.5;
@@ -1576,6 +1709,9 @@ export class Typewriter {
     this.backMat.dispose();
     this.legendMat?.dispose();
     this.rollMat?.dispose();
+    this.flagMat?.dispose();
+    this.flagTex?.dispose();
+    this.ribbonMat?.dispose();
     this.legend?.dispose();
   }
 }
@@ -1625,7 +1761,6 @@ export function mountTypewriter(canvas: HTMLCanvasElement, opts: TypewriterOptio
   const upc = new Vector3();
   let dist = 3;
   let follow = false;
-  let tight = false;
   let ready = false;
   let width = 1;
   let height = 1;
@@ -1663,24 +1798,33 @@ export function mountTypewriter(canvas: HTMLCanvasElement, opts: TypewriterOptio
       dist = fit(box, aim);
     };
     wideFrame();
-    // Pixels across one character: the paper has to stay readable, else it fills the width.
-    const px = (height / (2 * dist * tanY)) * TYPE.pitch;
-    const narrow = px < MIN_PX;
-    follow = narrow;
-    tight = narrow;
-    if (narrow) {
-      // The paper fills the width (its type stays readable), a touch below the print point
-      // in the frame, following the carriage.
-      dir.set(0, NARROW_TILT, 1).normalize();
+    // Pixels across one character: the paper has to stay readable. Too small, and the
+    // camera closes in on the paper just enough, turning down to it as it comes; on a narrow
+    // canvas it comes all the way, the paper filling the width, and follows the carriage.
+    const wide = dist;
+    const px = (height / (2 * wide * tanY)) * TYPE.pitch;
+    follow = false;
+    if (px < MIN_PX) {
       const p = typewriter.printPoint;
       const w = (TYPE.columns + 2) * TYPE.pitch * 1.04;
       const cx = typewriter.x0 + (MARGIN + TYPE.columns / 2) * TYPE.pitch;
+      dir.set(0, NARROW_TILT, 1).normalize();
       box.min.set(cx - w / 2, p.y - 0.01, p.z - 0.01);
       box.max.set(cx + w / 2, p.y + 0.01, p.z + 0.01);
-      aim.set(cx, p.y, p.z);
-      dist = fit(box, aim);
+      const paper = fit(box, corner.set(cx, p.y, p.z));
+      const need = (height * TYPE.pitch) / (2 * tanY * MIN_PX);
+      dist = Math.max(need, paper);
+      // How far in it has come: 0 the whole machine, 1 the paper alone.
+      const k = Math.min(1, Math.max(0, (wide - dist) / Math.max(1e-6, wide - paper)));
+      dir.set(0.06 * (1 - k), WIDE_TILT + (NARROW_TILT - WIDE_TILT) * k, 1).normalize();
+      const machine = typewriter.bounds.getCenter(corner);
       const visible = 2 * dist * tanY;
-      aim.y = p.y + visible * 0.16;
+      aim.set(
+        machine.x + (cx - machine.x) * k,
+        machine.y + (p.y + visible * 0.16 - machine.y) * Math.min(1, k * 1.6),
+        machine.z + (p.z - machine.z) * Math.min(1, k * 1.6),
+      );
+      follow = k > 0.5;
     }
     camera.near = dist * 0.05;
     camera.far = dist * 20;
@@ -1701,7 +1845,6 @@ export function mountTypewriter(canvas: HTMLCanvasElement, opts: TypewriterOptio
   };
 
   const place = (k: number) => {
-    if (!tight) dir.set(0.06, WIDE_TILT, 1).normalize();
     goal.copy(aim);
     if (follow) goal.x += typewriter.carriageX;
     here.lerp(goal, k);

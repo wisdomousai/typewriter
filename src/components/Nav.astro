@@ -1,0 +1,28 @@
+---
+// The pages, named, at the top of each.
+interface Props {
+  current: 'typewriter' | 'chat' | 'teleprinter';
+}
+const { current } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const pages = [
+  ['typewriter', 'Typewriter', base],
+  ['chat', 'Chat', `${base}chat/`],
+] as const;
+---
+
+<nav class="pages" aria-label="Pages">
+  {
+    pages.map(([id, name, href]) =>
+      id === current ? (
+        <h1>
+          <a href={href} aria-current="page">
+            {name}
+          </a>
+        </h1>
+      ) : (
+        <a href={href}>{name}</a>
+      ),
+    )
+  }
+</nav>

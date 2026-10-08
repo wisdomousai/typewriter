@@ -1,0 +1,275 @@
+---
+import '@fontsource/maple-mono/400.css';
+import '@fontsource/maple-mono/700.css';
+import Nav from '../components/Nav.astro';
+import '../styles/global.css';
+import '../styles/chat.css';
+
+const PALETTES = [
+  ['typewriter', 'Green'],
+  ['mustard', 'Mustard'],
+  ['navy', 'Navy'],
+  ['coral', 'Coral'],
+  ['lilac', 'Lilac'],
+  ['graphite', 'Graphite'],
+  ['cream', 'Cream'],
+];
+const DECOR = [
+  ['antenna', 'Antenna'],
+  ['stickers', 'Stickers'],
+  ['horn', 'Horn'],
+  ['lamp', 'Lamp'],
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Typewriter chat</title>
+  </head>
+  <body>
+    <main class="chat">
+      <header>
+        <Nav current="chat" />
+        <div class="room">
+          <span>Room</span>
+          <code data-room></code>
+          <button type="button" data-action="copy">Copy link</button>
+          <button type="button" data-action="new">New room</button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <div class="stage">
+          <canvas aria-hidden="true"></canvas>
+          <textarea
+            class="keys"
+            aria-label="Type when the line is yours"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"></textarea>
+        </div>
+
+        <aside>
+          <section class="line" aria-live="polite">
+            <p class="status" data-status></p>
+            <div class="buttons">
+              <button type="button" data-action="hold">Hold the line</button>
+              <button type="button" data-action="leave" hidden>Leave the line</button>
+              <button type="button" data-action="over" hidden>Over</button>
+            </div>
+          </section>
+
+          <section class="people">
+            <h2>In the room</h2>
+            <ul data-people></ul>
+          </section>
+
+          <form class="machine" aria-label="Your machine">
+            <h2>Your machine</h2>
+            <label>
+              <span>Name</span>
+              <input name="name" maxlength="20" autocomplete="nickname" />
+            </label>
+            <label>
+              <span>Colour</span>
+              <select name="palette">
+                {PALETTES.map(([id, name]) => <option value={id}>{name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Look</span>
+              <select name="look">
+                <option value="colour">Colour</option>
+                <option value="ink">Ink</option>
+                <option value="paper">Paper</option>
+              </select>
+            </label>
+            <fieldset>
+              <legend>Decor</legend>
+              {
+                DECOR.map(([id, name]) => (
+                  <label class="check">
+                    <input type="checkbox" name="decor" value={id} />
+                    <span>{name}</span>
+                  </label>
+                ))
+              }
+            </fieldset>
+            <label class="check">
+              <input type="checkbox" name="sound" />
+              <span>Sound</span>
+            </label>
+          </form>
+        </aside>
+      </div>
+
+      <dialog class="join">
+        <form method="dialog">
+          <label>
+            <span>Your name</span>
+            <input name="name" maxlength="20" required autocomplete="nickname" />
+          </label>
+          <button>Join</button>
+        </form>
+      </dialog>
+    </main>
+
+    <script>
+      import { setUpChat, type ChatView } from '../chat/chat';
+      import { ROOM } from '../chat/protocol';
+      import type { LookName } from '../typewriter/looks';
+
+      const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+      const SERVER = import.meta.env.PUBLIC_CHAT_URL ?? 'ws://localhost:8787';
+      const STORE = 'typewriter-chat';
+
+      // The room: from the address, or a new one (and the address says so, to share).
+      const url = new URL(location.href);
+      let room = url.searchParams.get('room') ?? '';
+      if (!ROOM.test(room)) {
+        room = Math.random().toString(36).slice(2, 10);
+        url.searchParams.set('room', room);
+        history.replaceState(null, '', url);
+      }
+      document.querySelector('[data-room]')!.textContent = room;
+
+      // You and your machine, as this browser last had them.
+      interface Mine {
+        name: string;
+        palette: string;
+        look: LookName;
+        decor: string[];
+        sound: boolean;
+      }
+      let mine: Mine = { name: '', palette: 'typewriter', look: 'colour', decor: ['antenna'], sound: true };
+      try {
+        mine = { ...mine, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') };
+      } catch {}
+      const keep = () => {
+        try {
+          localStorage.setItem(STORE, JSON.stringify(mine));
+        } catch {}
+      };
+
+      const form = document.querySelector<HTMLFormElement>('form.machine')!;
+      const el = <T extends Element>(name: string) => form.elements.namedItem(name) as unknown as T;
+      el<HTMLInputElement>('name').value = mine.name;
+      el<HTMLSelectElement>('palette').value = mine.palette;
+      el<HTMLSelectElement>('look').value = mine.look;
+      el<HTMLInputElement>('sound').checked = mine.sound;
+      form.querySelectorAll<HTMLInputElement>('[name="decor"]').forEach((c) => (c.checked = mine.decor.includes(c.value)));
+
+      const status = document.querySelector<HTMLElement>('[data-status]')!;
+      const list = document.querySelector<HTMLUListElement>('[data-people]')!;
+      const button = (a: string) => document.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+
+      function show(v: ChatView) {
+        const name = (id: string | null) => v.people.find((p) => p.id === id)?.name ?? 'Someone';
+        status.dataset.flag = v.mine ? 'yours' : v.place ? 'waiting' : v.line.floor ? 'busy' : 'free';
+        status.textContent =
+          v.state !== 'open'
+            ? 'Connecting…'
+            : v.mine
+              ? 'The line is yours: type.'
+              : v.place
+                ? `You're ${v.place === 1 ? 'next' : `number ${v.place}`} in line.`
+                : v.line.floor
+                  ? `${name(v.line.floor)} is typing.`
+                  : 'Nobody is typing.';
+        button('hold').hidden = v.mine || !!v.place;
+        button('leave').hidden = !v.place;
+        button('over').hidden = !v.mine;
+        list.replaceChildren(
+          ...v.people.map((p) => {
+            const li = document.createElement('li');
+            li.style.setProperty('--ink', p.ink);
+            const place = v.line.queue.indexOf(p.id) + 1;
+            li.dataset.state = v.line.floor === p.id ? 'typing' : place ? 'waiting' : '';
+            li.textContent = p.name + (p.id === v.me?.id ? ' (you)' : '');
+            if (v.line.floor === p.id) li.append(Object.assign(document.createElement('span'), { textContent: 'typing' }));
+            else if (place) li.append(Object.assign(document.createElement('span'), { textContent: `#${place}` }));
+            return li;
+          }),
+        );
+      }
+
+      const dark = matchMedia('(prefers-color-scheme: dark)');
+      let chat: ReturnType<typeof setUpChat> | null = null;
+      function join() {
+        chat = setUpChat(document.querySelector<HTMLElement>('.stage')!, {
+          url: `${SERVER.replace(/\/$/, '')}/room/${room}`,
+          models: `${BASE}models/`,
+          name: () => mine.name,
+          look: () => mine.look,
+          palette: mine.palette,
+          decor: mine.decor,
+          volume: mine.sound ? 0.7 : 0,
+          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+          onChange: show,
+        });
+        if (import.meta.env.DEV) Object.defineProperty(window, 'chat', { get: () => chat, configurable: true });
+      }
+
+      // A name first, then in.
+      const dialog = document.querySelector<HTMLDialogElement>('dialog.join')!;
+      if (mine.name) join();
+      else {
+        dialog.showModal();
+        dialog.addEventListener('close', () => {
+          const name = (dialog.querySelector('input') as HTMLInputElement).value.trim();
+          if (!name) return dialog.showModal();
+          mine.name = name;
+          el<HTMLInputElement>('name').value = name;
+          keep();
+          join();
+        });
+      }
+
+      button('hold').addEventListener('click', () => chat?.hold());
+      button('leave').addEventListener('click', () => chat?.leave());
+      button('over').addEventListener('click', () => chat?.over());
+      button('copy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(location.href);
+          button('copy').textContent = 'Copied';
+          setTimeout(() => (button('copy').textContent = 'Copy link'), 1500);
+        } catch {}
+      });
+      button('new').addEventListener('click', () => {
+        const next = new URL(location.href);
+        next.searchParams.delete('room');
+        location.href = next.toString();
+      });
+
+      form.addEventListener('submit', (e) => e.preventDefault());
+      form.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.name === 'name') {
+          const name = target.value.trim();
+          if (!name) return void (target.value = mine.name);
+          mine.name = name;
+          chat?.rename();
+        } else if (target.name === 'palette') {
+          mine.palette = target.value;
+          chat?.repaint(mine.palette);
+        } else if (target.name === 'look') {
+          mine.look = target.value as LookName;
+          chat?.relook();
+        } else if (target.name === 'decor') {
+          mine.decor = [...form.querySelectorAll<HTMLInputElement>('[name="decor"]:checked')].map((c) => c.value);
+          chat?.decor(mine.decor);
+        } else if (target.name === 'sound') {
+          mine.sound = target.checked;
+          chat?.setVolume(mine.sound ? 0.7 : 0);
+        }
+        keep();
+      });
+      dark.addEventListener('change', () => chat?.relook());
+    </script>
+  </body>
+</html>

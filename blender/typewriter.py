@@ -102,6 +102,16 @@ BAIL_R = PLATEN_R + 0.014
 LEVER_X = -CAP_X + XC  # the left end cap
 LEVER_PIVOT = (LEVER_X, 0.2, 0.68)
 GAUGE = (-HW + 0.002, -0.45, 0.165)
+# The flag on the right side, like a mailbox's: built raised (its arm upright), lowered by
+# turning it back (-X) until the arm lies along the side.
+FLAG_PIVOT = (HW + 0.016, -0.25, 0.30)
+FLAG_ARM = 0.3
+FLAG_HALF = (0.1, 0.066)  # the plate's half width (out from the arm) and half height
+# Decor, each on its own bone so the page can leave it off (it shrinks the bone to nothing).
+DECOR = ('antenna', 'stickers', 'horn', 'lamp')
+ANTENNA = (-0.63, 0.41, HUMP_TOP)
+HORN = (HW, 0.22, 0.26)
+LAMP = (-0.6, -0.5, HUMP_TOP)
 BELL = (0.60, -0.42, HUMP_TOP)
 CLAP_PIVOT = (BELL[0], BELL[1] - 0.095, HUMP_TOP - 0.015)
 CLAP_TIP = (BELL[0], BELL[1] - 0.058, HUMP_TOP + 0.04)
@@ -295,6 +305,14 @@ def bone_table(keys, slots):
         ('roll', (XC, ROLL[0], ROLL[1]), (XC, ROLL[0], ROLL[1] + 0.1), 'carriage', (1, 0, 0)),
         ('bell', CLAP_PIVOT, CLAP_TIP, 'body', (-1, 0, 0)),
         ('needle', GAUGE, (GAUGE[0], GAUGE[1], GAUGE[2] + 0.06), 'body', (1, 0, 0)),
+        ('flag', FLAG_PIVOT, (FLAG_PIVOT[0], FLAG_PIVOT[1], FLAG_PIVOT[2] + 0.1), 'body', (1, 0, 0)),
+        # the plate turns about the arm, to lie flat along the side when the flag is down
+        ('flagPlate', (FLAG_PIVOT[0], FLAG_PIVOT[1], FLAG_PIVOT[2] + 0.05),
+         (FLAG_PIVOT[0], FLAG_PIVOT[1], FLAG_PIVOT[2] + FLAG_ARM), 'flag', (1, 0, 0)),
+        ('decor_antenna', ANTENNA, (ANTENNA[0], ANTENNA[1], ANTENNA[2] + 0.1), 'body', (1, 0, 0)),
+        ('decor_stickers', (0, FRONT, 0.2), (0, FRONT, 0.3), 'body', (1, 0, 0)),
+        ('decor_horn', HORN, (HORN[0] + 0.1, HORN[1], HORN[2]), 'body', (0, 1, 0)),
+        ('decor_lamp', LAMP, (LAMP[0], LAMP[1], LAMP[2] + 0.1), 'body', (1, 0, 0)),
     ]
     return bones
 
@@ -636,6 +654,63 @@ def build(look='ink', flame=None):
     add(ball('GaugeLamp', 0.009, (gx - 0.008, gy, gz - 0.026), seg=(10, 6)), m['dot'](4))
     add(box('Needle', (0.003, 0.0035, 0.03), (gx - 0.016, gy, gz + 0.022), 0.4, seg=(6, 6)), m['glow'], 'needle')
     add(ball('NeedleHub', 0.011, (gx - 0.016, gy, gz), seg=(10, 6)), joint, 'needle')
+
+    # ---- the flag, raised: a post on the side, an arm up from its pivot, the plate at its top
+    # facing the typist (its face is drawn by the page: a colour and a number)
+    fx, fy, fz = FLAG_PIVOT
+    hw, hh = FLAG_HALF
+    add(box('FlagMount', (0.012, 0.04, 0.03), (HW + 0.004, fy, fz), 0.4, seg=(8, 8)), joint)
+    add(puck('FlagHub', 0.022, 0.009, (fx + 0.004, fy, fz), 0.5, seg=(16, 6)), knob, 'flag')
+    parts[-1].rotation_euler = (0, PI / 2, 0)
+    add(kit.tube('FlagArm', [(fx, fy, fz), (fx, fy, fz + FLAG_ARM)], 0.007, ring=8)[0], joint, 'flag')
+    top = fz + FLAG_ARM
+    plate = [(fx, fy, top - 2 * hh), (fx + 2 * hw, fy, top - 2 * hh), (fx + 2 * hw, fy, top), (fx, fy, top)]
+    face = kit.mesh_object('FlagFace', [(x, y - 0.004, z) for x, y, z in plate] + [(x, y + 0.004, z) for x, y, z in plate],
+                           [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)])
+    kit.planar_uv(face)
+    add(flat(face), kit.material('Flag', '#3a7a3a', roughness=0.7), 'flagPlate')
+    add(kit.tube('FlagRim', [(fx, fy - 0.005, top), (fx + 2 * hw, fy - 0.005, top), (fx + 2 * hw, fy - 0.005, top - 2 * hh),
+                             (fx, fy - 0.005, top - 2 * hh)], 0.0035, ring=6)[0], joint, 'flagPlate')
+    add(ball('FlagTip', 0.012, (fx, fy, top + 0.012), seg=(10, 6)), knob, 'flag')
+    # a catch on the side that the lowered arm rests in
+    add(box('FlagCatch', (0.01, 0.014, 0.012), (HW + 0.006, fy + FLAG_ARM, fz), 0.4, seg=(8, 6)), joint)
+
+    # ---- decor
+    # an antenna: a coiled spring at its foot, a whip, a lit ball at the top
+    ax, ay, az = ANTENNA
+    add(puck('AntennaFoot', 0.03, 0.01, (ax, ay, az + 0.01), 0.5, seg=(16, 6)), joint, 'decor_antenna')
+    parts[-1].rotation_euler = (0, 0, 0)
+    for k in range(4):
+        add(kit.torus('AntennaCoil', 0.014, 0.0035, seg=(12, 5), location=(ax, ay, az + 0.03 + k * 0.012),
+                      rotation=(0.15 * (-1) ** k, 0, 0)), knob, 'decor_antenna')
+    add(kit.tube('AntennaWhip', [(ax, ay, az + 0.02), (ax, ay, az + 0.5)], [0.006, 0.003], ring=6)[0], joint,
+        'decor_antenna')
+    add(ball('AntennaBall', 0.02, (ax, ay, az + 0.515), seg=(12, 8)), m['beacon'], 'decor_antenna')
+    # round stickers on the front and the sides
+    stickers = [((-0.56, FRONT - 0.001, 0.21), 0.034, 'StickerA', 'front'), ((0.24, FRONT - 0.001, 0.105), 0.026, 'StickerB', 'front'),
+                ((-HW - 0.001, 0.2, 0.2), 0.045, 'StickerC', 'left'), ((-0.25, FRONT - 0.001, 0.09), 0.02, 'StickerA', 'front')]
+    for at, r, role, side in stickers:
+        add(kit.superellipsoid('Sticker', (r, r, 0.0015), 0.5, 1.0, seg=(18, 4), location=at, rotation=FACING[side]),
+            m['role'](role, 'glow'), 'decor_stickers')
+    # a brass horn on the right side, for the bell to ring through
+    hx, hy, hz = HORN
+    add(box('HornMount', (0.01, 0.035, 0.035), (hx + 0.006, hy, hz), 0.4, seg=(8, 8)), joint, 'decor_horn')
+    horn = kit.lathe('Horn', [(0.0, 0.0), (0.012, 0.0), (0.014, 0.05), (0.022, 0.1), (0.045, 0.15), (0.085, 0.18),
+                              (0.08, 0.183), (0.04, 0.153), (0.008, 0.05), (0.0, 0.05)], seg=24,
+                     location=(hx + 0.01, hy, hz), rotation=(0, math.radians(60), 0))
+    add(horn, knob, 'decor_horn')
+    # a little desk lamp on the deck, its shade over the keys
+    lx, ly, lz = LAMP
+    add(puck('LampFoot', 0.035, 0.008, (lx, ly, lz + 0.008), 0.5, seg=(16, 6)), joint, 'decor_lamp')
+    parts[-1].rotation_euler = (0, 0, 0)
+    elbow = (lx, ly + 0.03, lz + 0.17)
+    head = (lx + 0.05, ly - 0.08, lz + 0.21)
+    add(kit.tube('LampArm', [(lx, ly, lz + 0.01), elbow, head], 0.006, ring=8)[0], joint, 'decor_lamp')
+    add(ball('LampElbow', 0.011, elbow, seg=(10, 6)), knob, 'decor_lamp')
+    shade = kit.lathe('LampShade', [(0.0, 0.0), (0.016, 0.0), (0.03, -0.035), (0.045, -0.06), (0.042, -0.062), (0.0, -0.02)],
+                      seg=20, location=head, rotation=(math.radians(-35), math.radians(15), 0))
+    add(shade, m['role']('Shade', 'shell'), 'decor_lamp')
+    add(ball('LampBulb', 0.016, (head[0] + 0.007, head[1] - 0.02, head[2] - 0.04), seg=(10, 8)), m['glow'], 'decor_lamp')
 
     bones = bone_table(keys, slots)
     armature = rig('TypewriterRig', bones)

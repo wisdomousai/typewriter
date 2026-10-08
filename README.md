@@ -23,11 +23,40 @@ It is an experiment, and still moving.
 - **Looks.** Ink, paper or colour, with a two-tone ribbon in the colour look.
 - **Sound.** Keys, typebars, the escapement, the platen's ratchet, the bell, the return and
   tearing the sheet off. All of it is made in the page, with no audio files.
+- **Endless paper.** Set *Paper* to *Endless* and the sheet becomes a roll that never runs
+  out: lines roll up and over the bail for as long as you type.
 - **Tear off** the sheet when you're done (it flies away and a fresh one feeds in), or save it
   as a picture first.
 
 Settings go in the address, so you can share a link to an emoji typewriter in colour:
 `?layout=emoji&look=colour`.
+
+## The chat
+
+**[Chat →](https://wisdomousai.github.io/typewriter/chat/)**
+
+A chat room for any number of people, each with their own typewriter on endless paper. The
+room is in the link (`/chat/?room=…`), so you share a room by sharing the address. One person
+holds the line and types at a time; everyone else sees every character land on their own
+paper as it is typed, each typist in their own ink, with their name in front.
+
+To type, ask to hold the line. You go to the back of the queue, and the flag on the side of
+your machine says where you stand:
+
+- **Green**: the line is yours. Type. *Over* (or Escape) hands it on.
+- **Yellow with a number**: your place in line.
+- **Bordeaux**: someone else is typing and you aren't in line.
+- **Down**: nobody is typing.
+
+If you don't start within 15 seconds, or stop for 10, the line goes to whoever is next. You can
+dress your machine: a colour, an antenna, stickers, a horn, a desk lamp.
+
+The rooms run on a Cloudflare Worker with one Durable Object per room (`chat/src/index.ts`).
+The sockets use the hibernation API, so a quiet room costs nothing. The room keeps who holds
+the line, the turn being typed, and the last 60 turns, for whoever comes in later. Every
+machine gets the same characters in the same order, so every machine lays the conversation out
+the same way (`src/chat/printer.ts`). The messages between page and room are typed in
+`src/chat/protocol.ts`.
 
 ## How it's made
 
@@ -75,6 +104,17 @@ bun run build      # the static site, into dist/
 To change the machine itself, edit `blender/typewriter.py` and run `bun run model` (needs
 Blender; it is built with 5.1). It rebuilds `public/models/typewriter.glb` and writes the measurements
 the page needs into `src/typewriter/typewriter.json`.
+
+### The chat locally
+
+```sh
+bun run chat       # the rooms, on ws://localhost:8787
+bun run dev        # then open http://localhost:5214/typewriter/chat/
+```
+
+`bun run chat:deploy` deploys the Worker (needs `wrangler login`). The built site talks to the
+address in `PUBLIC_CHAT_URL` (`.env.production`), or to `ws://localhost:8787` without it. The
+Worker only lets in pages from the origins listed at the top of `chat/src/index.ts`.
 
 ### A layout of your own
 

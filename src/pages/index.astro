@@ -1,6 +1,7 @@
 ---
 import '@fontsource/maple-mono/400.css';
 import '@fontsource/maple-mono/700.css';
+import Nav from '../components/Nav.astro';
 import Typewriter from '../components/Typewriter.astro';
 import { LAYOUTS } from '../typewriter/layouts';
 import '../styles/global.css';
@@ -17,12 +18,19 @@ import '../styles/global.css';
   <body>
     <main>
       <header>
-        <h1>Typewriter</h1>
+        <Nav current="typewriter" />
         <form class="settings" aria-label="Settings">
           <label>
             <span>Keyboard</span>
             <select name="layout">
               {Object.entries(LAYOUTS).map(([id, l]) => <option value={id}>{l.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Paper</span>
+            <select name="paper">
+              <option value="sheet">Sheet</option>
+              <option value="endless">Endless</option>
             </select>
           </label>
           <label>
@@ -63,6 +71,7 @@ import '../styles/global.css';
       const STORE = 'typewriter-settings';
       const defaults = {
         layout: 'us-qwerty',
+        paper: 'sheet',
         look: 'auto',
         stamps: 'colour',
         sound: '1',
@@ -79,6 +88,7 @@ import '../styles/global.css';
 
       const panel = document.querySelector<HTMLFormElement>('.settings')!;
       (panel.elements.namedItem('layout') as HTMLSelectElement).value = settings.layout;
+      (panel.elements.namedItem('paper') as HTMLSelectElement).value = settings.paper;
       (panel.elements.namedItem('look') as HTMLSelectElement).value = settings.look;
       (panel.elements.namedItem('stamps') as HTMLSelectElement).value = settings.stamps;
       (panel.elements.namedItem('still') as HTMLInputElement).checked = !!settings.still;
@@ -89,20 +99,27 @@ import '../styles/global.css';
       const look = (): LookName =>
         settings.look === 'auto' ? (dark.matches ? 'paper' : 'ink') : (settings.look as LookName);
 
-      const desk = setUpDesk(document.querySelector<HTMLElement>('.desk')!, {
-        models: `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}models/`,
-        look,
-        layout: settings.layout as LayoutName,
-        reducedMotion: !!settings.still,
-        volume: settings.sound ? VOLUME : 0,
-        onReady: (tw) => tw && (tw.paper.stamps = settings.stamps as 'colour' | 'ink'),
-      });
-      dark.addEventListener('change', desk.relook);
-      if (import.meta.env.DEV) Object.assign(window, { desk });
+      // The machine, set up again when its paper changes (sheets or a roll).
+      const setUp = () =>
+        setUpDesk(document.querySelector<HTMLElement>('.desk')!, {
+          models: `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}models/`,
+          look,
+          layout: settings.layout as LayoutName,
+          endless: settings.paper === 'endless',
+          reducedMotion: !!settings.still,
+          volume: settings.sound ? VOLUME : 0,
+          onReady: (tw) => tw && (tw.paper.stamps = settings.stamps as 'colour' | 'ink'),
+        });
+      let desk = setUp();
+      dark.addEventListener('change', () => desk.relook());
+      if (import.meta.env.DEV) Object.defineProperty(window, 'desk', { get: () => desk });
 
       panel.addEventListener('change', () => {
         const data = new FormData(panel);
         settings.layout = String(data.get('layout'));
+        const paper = String(data.get('paper'));
+        const repaper = paper !== settings.paper;
+        settings.paper = paper;
         settings.look = String(data.get('look'));
         settings.stamps = String(data.get('stamps'));
         settings.still = data.get('still') ? '1' : '';
@@ -115,6 +132,11 @@ import '../styles/global.css';
           if (v === defaults[k as keyof Settings]) url.searchParams.delete(k);
           else url.searchParams.set(k, v);
         history.replaceState(null, '', url);
+        if (repaper) {
+          desk.dispose();
+          desk = setUp();
+          return;
+        }
         const tw = desk.typewriter;
         if (!tw) return;
         tw.setLayout(settings.layout as LayoutName);

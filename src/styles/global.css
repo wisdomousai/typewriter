@@ -54,6 +54,27 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+.pages {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  font: 1rem / 1.2 var(--font-mono);
+}
+
+.pages a {
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+
+.pages a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.pages h1 a {
+  color: var(--ink);
+}
+
 .settings {
   display: flex;
   flex-wrap: wrap;

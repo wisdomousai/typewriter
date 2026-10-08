@@ -1,0 +1,13 @@
+{
+  // The typewriter chat's rooms: one Durable Object per room, opened over a WebSocket at
+  // /room/NAME. `npx wrangler dev` runs it locally (on :8787), `npx wrangler deploy` ships it.
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "typewriter-chat",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "Room" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "observability": { "enabled": true }
+}

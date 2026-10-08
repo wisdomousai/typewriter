@@ -14,7 +14,167 @@
       "Leg": "#22231f",
       "Tape": "#f7f7f2",
       "Ribbon": "#b8322a",
-      "Rim": "#d4ae5a"
+      "Rim": "#d4ae5a",
+      "StickerA": "#e6b422",
+      "StickerB": "#e26d5a",
+      "StickerC": "#f4f1e8",
+      "Shade": "#e8c66a"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  },
+  "mustard": {
+    "base": {
+      "shell": "#d9a521",
+      "joint": "#3b3a35",
+      "bezel": "#22231f",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#22231f",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#2a2a2a",
+      "Knob": "#2b2b2b",
+      "Rim": "#c9c4b5",
+      "StickerA": "#1f4fa8",
+      "StickerB": "#b8322a",
+      "StickerC": "#f4f1e8",
+      "Shade": "#2b2b2b"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  },
+  "navy": {
+    "base": {
+      "shell": "#24365e",
+      "joint": "#c9c4b5",
+      "bezel": "#151a26",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#151a26",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#f1ede2",
+      "Knob": "#d4ae5a",
+      "Rim": "#d4ae5a",
+      "StickerA": "#e6b422",
+      "StickerB": "#e26d5a",
+      "StickerC": "#f4f1e8",
+      "Shade": "#d4ae5a"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  },
+  "coral": {
+    "base": {
+      "shell": "#e26d5a",
+      "joint": "#f1ede2",
+      "bezel": "#2b2523",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#2b2523",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#2b2523",
+      "Knob": "#f1ede2",
+      "Rim": "#f1ede2",
+      "StickerA": "#24365e",
+      "StickerB": "#e6b422",
+      "StickerC": "#f4f1e8",
+      "Shade": "#f1ede2"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  },
+  "lilac": {
+    "base": {
+      "shell": "#9d8ec7",
+      "joint": "#ece8f5",
+      "bezel": "#2a2638",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#2a2638",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#2a2638",
+      "Knob": "#ece8f5",
+      "Rim": "#e8c66a",
+      "StickerA": "#e6b422",
+      "StickerB": "#2f6b5e",
+      "StickerC": "#f4f1e8",
+      "Shade": "#ece8f5"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  },
+  "graphite": {
+    "base": {
+      "shell": "#3a3d42",
+      "joint": "#a9adb3",
+      "bezel": "#1c1d20",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#1c1d20",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#1c1d20",
+      "Knob": "#d9472b",
+      "Rim": "#a9adb3",
+      "StickerA": "#d9472b",
+      "StickerB": "#e6b422",
+      "StickerC": "#f4f1e8",
+      "Shade": "#d9472b"
+    },
+    "dots": [
+      "#3a2a22",
+      "#ff7a54"
+    ]
+  },
+  "cream": {
+    "base": {
+      "shell": "#efe6cf",
+      "joint": "#6a6455",
+      "bezel": "#2a2824",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Leg": "#2a2824",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Cap": "#2a2824",
+      "Knob": "#7a2e2e",
+      "Rim": "#b89a5a",
+      "StickerA": "#7a2e2e",
+      "StickerB": "#2f6b5e",
+      "StickerC": "#24365e",
+      "Shade": "#7a2e2e"
     },
     "dots": [
       "#4a3a22",

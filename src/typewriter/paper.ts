@@ -1,4 +1,10 @@
-import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter, SRGBColorSpace } from 'three';
+import {
+  CanvasTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RepeatWrapping,
+  SRGBColorSpace,
+} from 'three';
 import { split } from './layouts';
 
 /**
@@ -9,6 +15,10 @@ import { split } from './layouts';
  * in one spot printing over each other. An emoji is a rubber stamp in a cell: in its own
  * colours, or (with `stamps` 'ink') in the ribbon's ink. Only the cells that changed are
  * drawn again.
+ *
+ * Endless paper (`ring`) has no top or bottom: the canvas holds the last `ring` lines, each
+ * on row line % ring, and repeats down the texture, so the paper can run on for ever. A
+ * line's row is wiped when a newer line takes it over.
  */
 export interface Spot {
   line: number;
@@ -26,6 +36,8 @@ export interface PaperOptions {
   bottomLines?: number;
   /** Emoji in their own colours, or stamped in the ribbon's ink. */
   stamps?: 'colour' | 'ink';
+  /** Endless paper: how many of the newest lines it keeps (the rest have gone by). */
+  ring?: number;
 }
 
 const PICTURE = /\p{Extended_Pictographic}/u;
@@ -45,6 +57,8 @@ interface Strike {
   dy: number;
   rot: number;
   alpha: number;
+  /** Its ribbon's colour, when it isn't the machine's own. */
+  ink?: string;
 }
 
 export class Paper {
@@ -77,15 +91,20 @@ export class Paper {
   private stampsIn: 'colour' | 'ink';
   /** A cell-sized canvas to ink a stamp on before it goes on the sheet. */
   private pad: HTMLCanvasElement | null = null;
+  /** Endless paper: lines kept, and which line each row holds now (-1: none yet). */
+  readonly ring: number;
+  private rowLine: Int32Array | null = null;
 
   /** `lineRatio` is the type grid's line height over its pitch, so the cells are as tall
    * as the paper's lines are. */
   constructor(opts: PaperOptions, lineRatio = 1.9) {
     this.columns = opts.columns;
-    this.lines = opts.lines ?? 40;
+    this.ring = opts.ring ?? 0;
+    this.lines = this.ring || (opts.lines ?? 40);
     this.sheetColumns = opts.sheetColumns;
-    this.topLines = opts.topLines ?? 3;
-    this.bottomLines = opts.bottomLines ?? 3;
+    this.topLines = this.ring ? 0 : (opts.topLines ?? 3);
+    this.bottomLines = this.ring ? 0 : (opts.bottomLines ?? 3);
+    if (this.ring) this.rowLine = new Int32Array(this.ring).fill(-1);
     this.stampsIn = opts.stamps ?? 'colour';
     this.margin = Math.floor((this.sheetColumns - this.columns) / 2);
     this.ch = Math.round(CELL_W * lineRatio);
@@ -104,6 +123,7 @@ export class Paper {
     this.texture.magFilter = LinearFilter;
     this.texture.minFilter = LinearMipmapLinearFilter;
     this.texture.anisotropy = 8;
+    if (this.ring) this.texture.wrapT = RepeatWrapping;
     this.blankSheet();
     this.ready = this.loadFont();
   }
@@ -130,15 +150,45 @@ export class Paper {
 
   /** Characters the sheet holds. */
   get capacity() {
-    return this.lines * this.columns;
+    return this.ring ? Infinity : this.lines * this.columns;
   }
 
   private has(at: Spot) {
-    return at.line >= 0 && at.line < this.lines && at.col >= 0 && at.col < this.columns;
+    if (at.col < 0 || at.col >= this.columns || at.line < 0) return false;
+    if (!this.rowLine) return at.line < this.lines;
+    // A line whose row a newer one has taken has gone by; a newer one takes its row.
+    const held = this.rowLine[at.line % this.ring];
+    if (held > at.line) return false;
+    if (held < at.line) this.claim(at.line);
+    return true;
   }
 
   private index(at: Spot) {
-    return at.line * this.columns + at.col;
+    return (this.ring ? at.line % this.ring : at.line) * this.columns + at.col;
+  }
+
+  /** Endless paper: a line takes its row over, wiped. */
+  private claim(line: number) {
+    const row = line % this.ring;
+    if (this.rowLine![row] === line) return;
+    this.rowLine![row] = line;
+    for (let col = 0; col < this.columns; col++) {
+      const i = row * this.columns + col;
+      if (this.strikes[i].length || this.ghosts[i].length || this.rules[i] || this.whole) {
+        this.strikes[i] = [];
+        this.ghosts[i] = [];
+        this.rules[i] = 0;
+        this.dirty.add(i);
+      }
+    }
+  }
+
+  /** Endless paper: blank paper ready up to this line (what is fed up from the roll must
+   * not show lines that have long gone by). */
+  reserve(line: number) {
+    if (!this.rowLine) return;
+    const from = Math.max(0, line - this.ring + 1);
+    for (let l = from; l <= line; l++) if (this.rowLine[l % this.ring] < l) this.claim(l);
   }
 
   private rand() {
@@ -149,8 +199,9 @@ export class Paper {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
-  /** A character lands on the paper (a space leaves nothing). */
-  print(ch: string, at: Spot) {
+  /** A character lands on the paper (a space leaves nothing), in the machine's ink or
+   * another ribbon's. */
+  print(ch: string, at: Spot, ink?: string) {
     if (!this.has(at) || ch === ' ' || ch === '') return;
     const i = this.index(at);
     const r = () => this.rand() - 0.5;
@@ -163,6 +214,7 @@ export class Paper {
       dy: r() * 1.8,
       rot: r() * 0.05,
       alpha: faint ? 0.42 + this.rand() * 0.15 : 0.8 + this.rand() * 0.2,
+      ink,
     });
     this.dirty.add(i);
   }
@@ -179,9 +231,9 @@ export class Paper {
   }
 
   /** Types a string at once, with no animation. */
-  text(at: Spot, str: string) {
+  text(at: Spot, str: string, ink?: string) {
     let col = at.col;
-    for (const ch of split(str)) this.print(ch, { line: at.line, col: col++ });
+    for (const ch of split(str)) this.print(ch, { line: at.line, col: col++ }, ink);
   }
 
   /** A dotted rule to type on, from col0 to col1 (both included). */
@@ -201,6 +253,7 @@ export class Paper {
       this.ghosts[i] = [];
     });
     this.rules.fill(0);
+    this.rowLine?.fill(-1);
     this.dirty.clear();
     this.blankSheet();
     this.whole = true;
@@ -259,9 +312,37 @@ export class Paper {
     const texture = new CanvasTexture(copy);
     texture.colorSpace = SRGBColorSpace;
     texture.flipY = false;
+    texture.wrapT = this.texture.wrapT;
     texture.minFilter = LinearMipmapLinearFilter;
     texture.anisotropy = 8;
     return texture;
+  }
+
+  /** The paper as a picture to keep: the sheet, or (endless paper) the lines it still
+   * has, oldest first, from the first typed to the last. */
+  picture(): HTMLCanvasElement {
+    this.flush();
+    if (!this.rowLine) return this.canvas;
+    const lines = [...this.rowLine].filter((l) => l >= 0).sort((a, b) => a - b);
+    const used = lines.filter((l) => {
+      const row = l % this.ring;
+      for (let c = 0; c < this.columns; c++) if (this.strikes[row * this.columns + c].length) return true;
+      return false;
+    });
+    const first = used[0] ?? 0;
+    const last = used[used.length - 1] ?? 0;
+    const out = document.createElement('canvas');
+    out.width = this.canvas.width;
+    out.height = (last - first + 3) * this.ch;
+    const c = out.getContext('2d')!;
+    c.fillStyle = PAPER;
+    c.fillRect(0, 0, out.width, out.height);
+    for (let l = first; l <= last; l++) {
+      const row = l % this.ring;
+      if (this.rowLine[row] !== l) continue;
+      c.drawImage(this.canvas, 0, row * this.ch, out.width, this.ch, 0, (l - first + 1) * this.ch, out.width, this.ch);
+    }
+    return out;
   }
 
   /** The bare sheet: paper all over, torn at the top and the bottom. */
@@ -271,6 +352,7 @@ export class Paper {
     c.clearRect(0, 0, W, H);
     c.fillStyle = PAPER;
     c.fillRect(0, 0, W, H);
+    if (this.ring) return;
     // A torn edge: short uneven bites of transparent paper along it.
     let s = 7;
     const r = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
@@ -329,10 +411,10 @@ export class Paper {
 
   private glyphs(list: Strike[], x: number, y: number, fade: number) {
     const c = this.ctx;
-    c.fillStyle = c.strokeStyle = INK;
     c.lineWidth = 0.7;
     c.lineJoin = 'round';
     for (const s of list) {
+      c.fillStyle = c.strokeStyle = s.ink ?? INK;
       if (PICTURE.test(s.ch)) {
         this.stamp(s, x, y, fade);
         continue;
@@ -364,7 +446,7 @@ export class Paper {
       const p = pad.getContext('2d')!;
       emoji(p, s.ch, pad.width / 2, pad.height / 2, pad.width);
       p.globalCompositeOperation = 'source-in';
-      p.fillStyle = INK;
+      p.fillStyle = s.ink ?? INK;
       p.fillRect(0, 0, pad.width, pad.height);
       c.drawImage(pad, -size / 2, -size / 2, size, size);
     } else emoji(c, s.ch, 0, 0, size);

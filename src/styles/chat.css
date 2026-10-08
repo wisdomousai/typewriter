@@ -1,0 +1,236 @@
+.chat header {
+  align-items: center;
+}
+
+.room {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.room code {
+  font: 700 var(--text-sm) / 1 var(--font-mono);
+  color: var(--ink);
+}
+
+.chat button {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.chat button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.layout {
+  display: grid;
+  gap: 1rem 2rem;
+}
+
+@media (min-width: 64rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    align-items: start;
+  }
+}
+
+.chat .stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  max-height: calc(100dvh - 5.5rem);
+  width: 100%;
+}
+
+@media (max-width: 40rem) {
+  .chat .stage {
+    aspect-ratio: 4 / 5;
+  }
+}
+
+.chat .stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+
+/* The field you type into, out of sight on the machine (font size 16px, so a phone doesn't
+   zoom in when it takes the focus). */
+.chat .keys {
+  position: absolute;
+  left: 50%;
+  bottom: 30%;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  font-size: 16px;
+}
+
+.stage[data-broken]::after {
+  content: 'This needs WebGL.';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+}
+
+aside {
+  display: grid;
+  gap: 1.5rem;
+  font-size: var(--text-sm);
+}
+
+aside h2,
+aside legend {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  font: 700 var(--text-sm) / 1.2 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.status {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  position: relative;
+}
+
+.status::before {
+  content: '';
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: -0.25rem;
+  border-radius: 2px;
+  background: var(--rule-strong);
+}
+
+.status[data-flag='yours']::before {
+  background: #2f8f46;
+}
+.status[data-flag='waiting']::before {
+  background: #e6b422;
+}
+.status[data-flag='busy']::before {
+  background: #6d1a2a;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.people ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.people li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.people li::before {
+  content: '';
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--ink);
+  flex: none;
+}
+
+.people li span {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+}
+
+.machine {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.machine label {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-faint);
+}
+
+.machine label.check {
+  display: inline-flex;
+  margin-right: 0.9rem;
+  color: var(--ink);
+}
+
+.machine fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.machine input:not([type]),
+.machine select,
+.join input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.machine input[type='checkbox'] {
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.join {
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 1.25rem;
+}
+
+.join::backdrop {
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+}
+
+.join form {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.join label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
