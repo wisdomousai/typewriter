@@ -1,15 +1,14 @@
 ---
 name: typewriter
-description: Add the robot typewriter or teleprinter (package github:wisdomousai/typewriter, three.js) to a website — a hero that types a line, a contact form typed onto paper, a teleprinter that prints messages or notifications, or a typewriter chat on the site's own Cloudflare account. Use when someone wants a 3D/animated typewriter, teleprinter or typed-out text in their own site or app.
+description: Add the robot typewriter or teleprinter (package github:wisdomousai/typewriter, three.js) to a website — a hero that types a line, a contact form typed onto paper, or a teleprinter that prints messages or notifications. Use when someone wants a 3D/animated typewriter, teleprinter or typed-out text in their own site or app.
 ---
 
 # The robot typewriter in your site
 
 Two machines, each drawn on a canvas of its own with three.js: the **typewriter** (keys,
 typebars, carriage, sheets or endless paper) and the **teleprinter** (prints telegrams on a
-roll). Plus a **chat** where everyone types on their own machine, served by a Cloudflare
-Worker the site deploys itself. Everything below goes into the user's site; nothing depends on
-the project's demo pages.
+roll). Everything below goes into the user's site; nothing depends on the project's demo
+pages.
 
 ## 1. Install and serve the models
 
@@ -149,70 +148,6 @@ in capitals, wrapped at spaces. They print one at a time in order; `send` resolv
 on the paper. Feed it from anything: a form, a WebSocket, server-sent events, or the page's
 own address (read `?m=` yourself to make shareable telegram links). `teleprinter.online = true`
 lights its line lamp.
-
-### A typewriter chat on the site
-
-Each visitor types on their own typewriter, one at a time, in their own ink. The rooms are a
-Cloudflare Worker that **the site deploys to its own account** (free plan is enough).
-
-**Deploy the Worker** (once, from the site's repo):
-
-```sh
-cp -r node_modules/typewriter/chat ./chat
-```
-
-- In `chat/wrangler.jsonc`, set `"name"` and `vars.ORIGINS` to the site's origin(s), comma
-  separated (`https://example.com`). Local pages always may connect. `vars.MAX_SESSIONS` caps
-  machines at once across all rooms (10).
-- `npx wrangler login`, then the user runs `DOMAINS=example.com sh chat/setup.sh`. It makes a
-  Turnstile widget and writes the Worker's secrets. It handles secrets, so let the user run it.
-  It prints the widget's site key and puts it in `.env.production` as `PUBLIC_TURNSTILE_SITEKEY`.
-- `npx wrangler deploy --config chat/wrangler.jsonc`, and note the `wss://…workers.dev` address.
-
-**The page**: a root element holding a canvas and a hidden textarea:
-
-```html
-<div class="chat-stage" style="position: relative; aspect-ratio: 4 / 3">
-  <canvas style="width: 100%; height: 100%; display: block"></canvas>
-  <textarea class="keys" aria-label="Type"
-    style="position: absolute; left: 50%; bottom: 30%; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; resize: none; font-size: 16px"></textarea>
-  <div data-check></div>
-</div>
-```
-
-```ts
-import { setUpChat } from 'typewriter/chat';
-import { getPass, storedPass } from 'typewriter/pass';
-
-const SERVER = 'wss://typewriter-chat.example.workers.dev';
-const SITEKEY = '0x…';            // the site key setup.sh printed
-const root = document.querySelector<HTMLElement>('.chat-stage')!;
-// The captcha once; the pass is good for two hours and kept in this browser.
-const pass = storedPass() ?? (await getPass(SERVER.replace(/^ws/, 'http'), root.querySelector('[data-check]')!, SITEKEY));
-
-const chat = setUpChat(root, {
-  url: `${SERVER}/room/lobby?pass=${encodeURIComponent(pass)}`,  // room: [a-z0-9-]{1,40}
-  models: '/models/',
-  name: () => visitorName,         // ask for it first; up to 20 characters
-  look: () => 'colour',
-  palette: 'typewriter',
-  decor: ['antenna'],              // antenna | stickers | horn | lamp
-  volume: 0.7,
-  reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-  onChange: (view) => render(view), // who's in, who holds the line, your place, your draft
-});
-chat.focus();
-```
-
-`view.mine` (the line is yours), `view.place` (your place in line), `view.people`,
-`view.draft`, and `view.ended` (`'full' | 'idle' | 'pass'`: the room let the machine go; on
-`'pass'`, call `forgetPass()` and ask again) are what a status panel needs. `chat.hold()`,
-`chat.leave()`, `chat.over()` are the buttons. Typing just works: a free line is taken, Enter
-hands it on, and on a busy line the text waits as a draft.
-
-For development, `cp chat/.dev.vars.example chat/.dev.vars` and `npx wrangler dev --config
-chat/wrangler.jsonc` serve the rooms on `ws://localhost:8787` with Turnstile's always-pass test
-keys (the default site key in `pass.ts` is the matching test key).
 
 ## 4. Reference
 

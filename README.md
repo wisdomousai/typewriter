@@ -184,8 +184,8 @@ top of `chat/src/index.ts`.
 
 `skills/typewriter/SKILL.md` teaches a coding agent (Claude Code, or anything that reads
 skills) to put the machines into your own site: a hero that types a line, a contact form typed
-onto the paper, a teleprinter printing your messages, or the chat on your own Cloudflare
-account, in Astro, React/Next, Svelte or plain Vite. It's optional. To use it, copy the folder into your project's `.claude/skills/` (or
+onto the paper, or a teleprinter printing your messages, in Astro, React/Next, Svelte or
+plain Vite. It's optional. To use it, copy the folder into your project's `.claude/skills/` (or
 `~/.claude/skills/` for every project).
 
 ## How it's made
