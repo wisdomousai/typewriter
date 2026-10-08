@@ -11,7 +11,7 @@ import '../styles/teleprinter.css';
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="light dark" />
     <title>Teleprinter</title>
   </head>
@@ -139,6 +139,11 @@ import '../styles/teleprinter.css';
         keep();
         void wire.send({ text, from: mine.from });
         textField.value = '';
+        // On a phone the machine is above the form: the keyboard down, and the machine in sight.
+        if (matchMedia('(max-width: 63.99rem)').matches) {
+          textField.blur();
+          stage.scrollIntoView({ behavior: mine.still ? 'auto' : 'smooth', block: 'start' });
+        }
       });
       textField.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {

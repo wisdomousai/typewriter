@@ -28,3 +28,16 @@
 .duet .room a {
   color: var(--ink);
 }
+
+/* Stacked on a phone: both machines short enough to stay in sight over the keyboard. */
+@media (max-width: 55.99rem) {
+  .duet .stage {
+    aspect-ratio: auto;
+    height: 30svh;
+    min-height: 11rem;
+  }
+  .duet .status {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+}

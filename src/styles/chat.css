@@ -252,3 +252,63 @@ aside legend {
   margin: 0.75rem 0;
   font-size: var(--text-sm);
 }
+
+/* On a phone: the machine square, the line's status above it (in sight while the keyboard is
+   up), and the field you type into at the top of the machine, so bringing up the keyboard
+   doesn't scroll the machine away. */
+@media (max-width: 63.99rem) {
+  .chat:not(.wire) aside {
+    display: contents;
+  }
+  .chat:not(.wire) .line,
+  .chat:not(.wire) .people,
+  .chat:not(.wire) .machine {
+    font-size: var(--text-sm);
+  }
+  .chat .line {
+    order: -1;
+  }
+  .chat .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .chat .line .status {
+    flex: 1 1 12rem;
+    margin: 0;
+  }
+  .chat .line .draft {
+    flex-basis: 100%;
+    order: 1;
+    margin: 0;
+  }
+  .chat .keys {
+    top: 0.5rem;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 40rem) {
+  .chat .stage {
+    aspect-ratio: 1 / 1;
+  }
+}
+
+.join {
+  max-width: calc(100vw - 2rem);
+  box-sizing: border-box;
+}
+
+@media (max-width: 30rem) {
+  .join {
+    width: calc(100vw - 2rem);
+  }
+  .join form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .join .check {
+    margin: 0;
+  }
+}
