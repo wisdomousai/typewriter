@@ -1,8 +1,8 @@
-"""Export the typewriter for the page: its mesh and skeleton, and nothing else. The page
+"""Export a machine (the typewriter, or the teleprinter) for the page: its mesh and skeleton, and nothing else. The page
 animates every bone live, so there are no clips, and it builds its own materials, so
 materials only travel as names (Shell, Joint, Glow, ...) that tell it which part is which.
 
-    Blender -b --factory-startup -P blender/export.py -- OUT.glb
+    Blender -b --factory-startup -P blender/export.py -- OUT.glb [typewriter|teleprinter]
 
 blender/build.sh runs this and compresses the result into public/models/.
 """
@@ -13,8 +13,9 @@ import sys
 import bpy
 
 sys.path.insert(0, os.path.dirname(__file__))
+import importlib  # noqa: E402
+
 import kit  # noqa: E402
-import typewriter  # noqa: E402
 
 def join(rig, parts):
     """One skinned mesh: the exporter splits it into one primitive per material."""
@@ -37,9 +38,10 @@ def strip_textures(obj):
 def main():
     argv = sys.argv[sys.argv.index('--') + 1 :]
     out = os.path.abspath(argv[0])
+    machine = importlib.import_module(argv[1] if len(argv) > 1 else 'typewriter')
     kit.reset_scene()
-    typewriter.write_geometry()
-    rig, parts = typewriter.build('ink', 'glow')
+    machine.write_geometry()
+    rig, parts = machine.build('ink', 'glow')
     body = join(rig, parts)
     strip_textures(body)
     bpy.ops.export_scene.gltf(

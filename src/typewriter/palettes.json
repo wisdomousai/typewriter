@@ -180,5 +180,28 @@
       "#4a3a22",
       "#ffb454"
     ]
+  },
+  "teleprinter": {
+    "base": {
+      "shell": "#cdc4aa",
+      "joint": "#6d6a60",
+      "bezel": "#2b2a26",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Knob": "#2b2a26",
+      "Leg": "#2b2a26",
+      "Rim": "#b9a77a",
+      "Dial": "#2f6b5e",
+      "Wheel": "#d4ae5a",
+      "Ribbon": "#b8322a",
+      "Plate": "#2f6b5e"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
   }
 }

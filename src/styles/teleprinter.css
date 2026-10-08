@@ -1,0 +1,53 @@
+.send {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.send label {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-faint);
+}
+
+.send label.message {
+  grid-template-columns: 1fr;
+  gap: 0.3rem;
+}
+
+.send input,
+.send textarea,
+.listen input {
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.send textarea {
+  resize: vertical;
+  font: var(--text-sm) / 1.4 var(--font-mono);
+  text-transform: uppercase;
+}
+
+.listen .room {
+  flex-wrap: nowrap;
+  margin-bottom: 0.75rem;
+}
+
+.listen .room input {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+
+.listen .status {
+  margin: 0 0 0.5rem;
+}
+
+.listen .check:empty {
+  display: none;
+}

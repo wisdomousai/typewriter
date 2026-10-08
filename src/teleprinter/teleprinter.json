@@ -1,0 +1,27 @@
+{
+  "type": {
+    "_": "The paper's grid: characters per line, the print head's step per character, the platen's turn per line (as paper travel), and the roll's width.",
+    "columns": 32,
+    "pitch": 0.024,
+    "line": 0.045,
+    "paperWidth": 0.864
+  },
+  "geometry": {
+    "_": "Owned by teleprinter.py: rewritten from the model whenever it changes (blender/build.sh). Metres in Blender frame (Z up, machine faces -Y, reader right = +X); [y, z] pairs lie in the plane x = 0. The head rests at column 0 and slides +X one pitch per character; the platen turns about its local X, positive = line feed (paper moves up at the front).",
+    "print": [0.0, 0.0152, 0.5257],
+    "printAngle": -0.0873,
+    "platenAxis": [0.08, 0.52],
+    "platenRadius": 0.065,
+    "bail": [0.0731, 0.8],
+    "exitAngle": 0.2094,
+    "roll": [0.3, 0.5],
+    "rollRadius": 0.075,
+    "table": [0.17, 0.445],
+    "tableTop": [0.27, 0.429],
+    "paperX": [-0.432, 0.432],
+    "textX0": -0.384,
+    "peckBack": 0.14,
+    "bellSwing": 0.5,
+    "dialStep": 0.4712
+  }
+}

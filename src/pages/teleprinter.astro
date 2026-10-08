@@ -1,0 +1,231 @@
+---
+import '@fontsource/maple-mono/400.css';
+import '@fontsource/maple-mono/700.css';
+import Nav from '../components/Nav.astro';
+import '../styles/global.css';
+import '../styles/chat.css';
+import '../styles/teleprinter.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Teleprinter</title>
+  </head>
+  <body>
+    <main class="chat wire">
+      <header>
+        <Nav current="teleprinter" />
+      </header>
+
+      <div class="layout">
+        <div class="stage">
+          <canvas aria-hidden="true"></canvas>
+        </div>
+
+        <aside>
+          <form class="send" aria-label="Send a telegram">
+            <h2>Telegram</h2>
+            <label>
+              <span>From</span>
+              <input name="from" maxlength="20" autocomplete="nickname" />
+            </label>
+            <label class="message">
+              <span>Message</span>
+              <textarea name="text" rows="5" maxlength="2000" required></textarea>
+            </label>
+            <div class="buttons">
+              <button>Send</button>
+              <button type="button" data-action="copy">Copy link</button>
+            </div>
+          </form>
+
+          <section class="listen">
+            <h2>Chat room</h2>
+            <form class="room" data-listen>
+              <input name="room" maxlength="40" pattern="[a-z0-9\-]+" aria-label="Room" placeholder="room" />
+              <button>Listen</button>
+              <button type="button" data-action="stop" hidden>Stop</button>
+            </form>
+            <p class="status" data-status hidden></p>
+            <div class="check" data-check></div>
+          </section>
+
+          <form class="machine" aria-label="The machine">
+            <h2>The machine</h2>
+            <label>
+              <span>Look</span>
+              <select name="look">
+                <option value="colour">Colour</option>
+                <option value="ink">Ink</option>
+                <option value="paper">Paper</option>
+              </select>
+            </label>
+            <label class="check">
+              <input type="checkbox" name="sound" />
+              <span>Sound</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" name="still" />
+              <span>Reduced motion</span>
+            </label>
+          </form>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      import { getPass, forgetPass, storedPass } from '../chat/pass';
+      import { ROOM } from '../chat/protocol';
+      import { listen, type ListenState } from '../teleprinter/listen';
+      import { Wire } from '../teleprinter/telegram';
+      import { mountTeleprinter } from '../teleprinter/teleprinter';
+      import type { LookName } from '../typewriter/looks';
+
+      const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+      const SERVER = (import.meta.env.PUBLIC_CHAT_URL ?? 'ws://localhost:8787').replace(/\/$/, '');
+      const HTTP = SERVER.replace(/^ws/, 'http');
+      const STORE = 'teleprinter';
+      const VOLUME = 0.7;
+
+      // The machine as this browser last had it.
+      let mine = { from: '', look: 'colour' as LookName, sound: true, still: matchMedia('(prefers-reduced-motion: reduce)').matches };
+      try {
+        mine = { ...mine, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') };
+      } catch {}
+      const keep = () => {
+        try {
+          localStorage.setItem(STORE, JSON.stringify(mine));
+        } catch {}
+      };
+
+      const stage = document.querySelector<HTMLElement>('.stage')!;
+      const canvas = stage.querySelector('canvas')!;
+      let mounted: ReturnType<typeof mountTeleprinter>;
+      try {
+        mounted = mountTeleprinter(canvas, { models: `${BASE}models/`, look: mine.look, reducedMotion: mine.still, volume: mine.sound ? VOLUME : 0 });
+      } catch {
+        stage.dataset.broken = '';
+        throw new Error('No WebGL.');
+      }
+      const { teleprinter } = mounted;
+      mounted.start();
+      canvas.addEventListener('pointermove', (e) => teleprinter.look(mounted.ndc(e)));
+      canvas.addEventListener('pointerleave', () => teleprinter.look(null));
+      const wire = new Wire(teleprinter);
+      if (import.meta.env.DEV) Object.assign(window, { teleprinter, wire });
+
+      // A telegram: sent here, or carried in the address (?m=, and ?from=).
+      const send = document.querySelector<HTMLFormElement>('form.send')!;
+      const field = <T extends Element>(f: HTMLFormElement, name: string) => f.elements.namedItem(name) as unknown as T;
+      const fromField = field<HTMLInputElement>(send, 'from');
+      const textField = field<HTMLTextAreaElement>(send, 'text');
+      fromField.value = mine.from;
+      const params = new URLSearchParams(location.search);
+      const carried = params.get('m');
+      if (carried) {
+        textField.value = carried;
+        if (params.get('from')) fromField.value = params.get('from')!;
+        teleprinter.ready.then(() => wire.send({ text: carried, from: fromField.value }));
+      }
+      send.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = textField.value.trim();
+        if (!text) return;
+        mine.from = fromField.value.trim();
+        keep();
+        void wire.send({ text, from: mine.from });
+        textField.value = '';
+      });
+      textField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+          e.preventDefault();
+          send.requestSubmit();
+        }
+      });
+      const button = (a: string) => document.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!;
+      button('copy').addEventListener('click', async () => {
+        const url = new URL(location.href);
+        url.search = '';
+        const text = textField.value.trim();
+        if (text) url.searchParams.set('m', text);
+        if (text && fromField.value.trim()) url.searchParams.set('from', fromField.value.trim());
+        try {
+          await navigator.clipboard.writeText(url.toString());
+          button('copy').textContent = 'Copied';
+          setTimeout(() => (button('copy').textContent = 'Copy link'), 1500);
+        } catch {}
+      });
+
+      // On a chat room's line: the captcha's pass first (a pass this browser has will do).
+      const listenForm = document.querySelector<HTMLFormElement>('[data-listen]')!;
+      const roomField = field<HTMLInputElement>(listenForm, 'room');
+      const status = document.querySelector<HTMLElement>('[data-status]')!;
+      const check = document.querySelector<HTMLElement>('[data-check]')!;
+      roomField.value = params.get('room') ?? '';
+      let line: ReturnType<typeof listen> | null = null;
+      const SAY: Record<ListenState, string> = {
+        connecting: 'Connecting…',
+        open: 'On the line: each turn prints when it’s over.',
+        closed: 'Off the line.',
+        full: 'The chat is full.',
+        idle: 'The chat let the teleprinter go.',
+        pass: 'The pass ran out.',
+      };
+      const showLine = (s: ListenState) => {
+        status.hidden = false;
+        status.textContent = SAY[s];
+        status.dataset.flag = s === 'open' ? 'yours' : s === 'connecting' ? 'waiting' : 'free';
+        teleprinter.online = s === 'open';
+        const on = s === 'open' || s === 'connecting';
+        button('stop').hidden = !on;
+        listenForm.querySelector<HTMLButtonElement>('button:not([type])')!.hidden = on;
+        if (s === 'pass') forgetPass();
+      };
+      listenForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const room = roomField.value.trim().toLowerCase();
+        if (!ROOM.test(room)) return roomField.focus();
+        line?.close();
+        let pass = storedPass();
+        if (!pass) {
+          showLine('connecting');
+          try {
+            pass = await getPass(HTTP, check);
+          } catch (error) {
+            check.textContent = (error as Error).message;
+            return showLine('closed');
+          }
+          check.replaceChildren();
+        }
+        const url = new URL(location.href);
+        url.searchParams.set('room', room);
+        history.replaceState(null, '', url);
+        line = listen(`${SERVER}/room/${room}?pass=${encodeURIComponent(pass)}`, wire, showLine);
+      });
+      button('stop').addEventListener('click', () => {
+        line?.close();
+        line = null;
+        showLine('closed');
+      });
+
+      // The machine's look, sound and motion.
+      const machine = document.querySelector<HTMLFormElement>('form.machine')!;
+      field<HTMLSelectElement>(machine, 'look').value = mine.look;
+      field<HTMLInputElement>(machine, 'sound').checked = mine.sound;
+      field<HTMLInputElement>(machine, 'still').checked = mine.still;
+      machine.addEventListener('change', () => {
+        mine.look = field<HTMLSelectElement>(machine, 'look').value as LookName;
+        mine.sound = field<HTMLInputElement>(machine, 'sound').checked;
+        mine.still = field<HTMLInputElement>(machine, 'still').checked;
+        keep();
+        teleprinter.dress(mine.look);
+        teleprinter.reducedMotion = mine.still;
+        mounted.sounds.volume = mine.sound ? VOLUME : 0;
+      });
+    </script>
+  </body>
+</html>
