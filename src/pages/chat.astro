@@ -184,9 +184,10 @@ const DECOR = [
           : v.state !== 'open'
             ? 'Connecting…'
             : v.mine
-              ? 'The line is yours: type.'
+              ? 'The line is yours: type, and Enter when you’re done.'
               : v.place
-                ? `You're ${v.place === 1 ? 'next' : `number ${v.place}`} in line.`
+                ? `You're ${v.place === 1 ? 'next' : `number ${v.place}`} in line.` +
+                  (v.done ? ' Yours goes out then.' : v.draft ? ' Enter when it’s finished.' : '')
                 : v.line.floor
                   ? `${name(v.line.floor)} is typing.`
                   : 'The line is free: type.';
@@ -254,6 +255,8 @@ const DECOR = [
         el<HTMLInputElement>('name').value = name;
         keep();
         join();
+        // A closing modal hands focus back to where it was (the form's Name, say): the machine.
+        chat?.focus();
       });
       /** In again after the room let this machine go (with a fresh pass, if that was why). */
       function again() {

@@ -14,8 +14,10 @@ import SPEC from '../typewriter/typewriter.json';
  * place in line; bordeaux, someone else is typing and you aren't in line; down, nobody is
  * typing.
  *
- * You just type: if the line is free it's yours at once, and if it's busy you join the line and
- * what you type waits (the draft) until your turn, when it goes out. You type into a field kept
+ * You just type: if the line is free it's yours at once, and yours until you press Enter (Shift
+ * Enter starts a new line). If it's busy you join the line and what you type waits (the draft)
+ * until your turn, when it goes out; Enter while you wait says it's finished, so the line goes
+ * on as soon as it's out. You type into a field kept
  * out of sight on the machine (so a phone's keyboard and input methods work), or click the
  * machine's keys. The markup is chat.astro's.
  */
@@ -52,8 +54,10 @@ export interface ChatView {
   place: number;
   /** The line is yours. */
   mine: boolean;
-  /** What you've typed while waiting your turn: it goes out when the line is yours. */
+  /** What you've typed while waiting your turn: it goes out when the line is yours, and the
+   * line goes on at once if you pressed Enter (`done`). */
   draft: string;
+  done: boolean;
   /** The room let this machine go for good: the chat was full, it sat idle, or its pass ran
    * out (the page does the check again). And what the room last said about it. */
   ended: 'full' | 'idle' | 'pass' | null;
@@ -80,6 +84,7 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     place: 0,
     mine: false,
     draft: '',
+    done: false,
     ended: null,
     notice: '',
   };
@@ -160,16 +165,16 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
         break;
       case 'line':
         view.line = m.line;
+        if (m.line.floor === view.me?.id) flush();
         break;
       case 'turn':
         p.begin(m.turn);
         if (m.turn.id === view.me?.id) {
+          // The line's news may come after the turn: it's yours from now.
+          view.line = { ...view.line, floor: m.turn.id, queue: view.line.queue.filter((q) => q !== m.turn.id) };
           tw!.mood('happy');
           field.focus({ preventScroll: true });
-          // What you typed while you waited goes out now.
-          const draft = view.draft;
-          view.draft = '';
-          if (draft) send(draft);
+          flush();
         } else tw!.ding();
         break;
       case 'type':
@@ -221,8 +226,20 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     if (view.mine) return send(s);
     if (view.state !== 'open') return void tw?.mood('puzzled');
     view.draft = (view.draft + s).slice(0, LIMITS.turn);
+    view.done = false;
     if (!view.place) link.send({ t: 'hold' });
     tell();
+  }
+
+  /** The line is yours: what you typed while you waited goes out now (and, if you'd finished
+   * it, the line goes on). */
+  function flush() {
+    const { draft, done } = view;
+    view.draft = '';
+    view.done = false;
+    tell();
+    if (draft) send(draft);
+    if (done) over();
   }
 
   function send(s: string) {
@@ -235,6 +252,7 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     if (!printer) return;
     if (!view.mine) {
       view.draft = split(view.draft).slice(0, -1).join('');
+      view.done = false;
       return tell();
     }
     printer.back();
@@ -262,10 +280,10 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
   field.addEventListener(
     'keydown',
     (e) => {
-      // Escape hands the line on.
-      if (e.key === 'Escape' && view.mine) {
+      // Enter (or Escape) hands the line on, or finishes the draft; Shift Enter is a new line.
+      if ((e.key === 'Enter' && !e.shiftKey && !e.isComposing) || (e.key === 'Escape' && view.mine)) {
         e.preventDefault();
-        over();
+        enter();
       }
     },
     { signal },
@@ -307,6 +325,11 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
       case 'back':
         return back();
       case 'ret':
+        if (!shifted && !mod) return enter();
+        if (shifted && shifted !== 'lock') {
+          tw!.hold(shifted, false);
+          shifted = null;
+        }
         return type('\n');
       case 'space':
         return type(' ');
@@ -327,9 +350,19 @@ export function setUpChat(root: HTMLElement, opts: ChatOptions) {
     link.send({ t: 'hold' });
     field.focus({ preventScroll: true });
   }
+  /** Done: the line goes on (or, waiting, the draft is finished and goes out when it's your
+   * turn, the line going on after it). */
+  function enter() {
+    if (view.mine) return over();
+    if (!view.draft.trim()) return;
+    view.done = true;
+    tell();
+  }
+
   /** Out of line, and the draft with you. */
   function leave() {
     view.draft = '';
+    view.done = false;
     link.send({ t: 'leave' });
     tell();
   }

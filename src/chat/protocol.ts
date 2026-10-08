@@ -91,7 +91,7 @@ export const LIMITS = {
   people: 8,
   /** How long the line waits for its holder to start typing, and for them to go on (ms). */
   first: 15000,
-  idle: 10000,
+  idle: 30000,
 };
 
 /** Why a room closed a machine's socket for good (WebSocket close codes): the chat is full,
