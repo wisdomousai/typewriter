@@ -1,0 +1,162 @@
+/* The form on the typewriter (desk.ts). Everything is under .desk; --stage is the machine's
+   frame. */
+
+.desk {
+  --stage: 1 / 1;
+  position: relative;
+}
+
+.desk .stage {
+  display: none;
+  position: relative;
+  aspect-ratio: var(--stage);
+}
+
+.desk .stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+
+/* The plain form. */
+.desk .letter {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 38rem;
+}
+
+.desk .field {
+  display: grid;
+  gap: 0.4rem;
+  height: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.desk .field label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.desk .field input,
+.desk .field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 1rem/1.5 var(--font-mono);
+  resize: vertical;
+}
+
+.desk .field input:focus-visible,
+.desk .field textarea:focus-visible {
+  outline: 0;
+  border-bottom-color: var(--ink);
+}
+
+/* The typewriter: the paper is the form. The fields stay in the page, over the stage and
+   unseen, the focused one kept where the caret is (--x, --y, set by the script). */
+.desk[data-mode='typewriter'] .stage {
+  display: block;
+}
+
+.desk[data-mode='typewriter'] .letter {
+  position: absolute;
+  inset: 0 0 auto;
+  aspect-ratio: var(--stage);
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.desk[data-mode='typewriter'] .field label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.desk[data-mode='typewriter'] .field input,
+.desk[data-mode='typewriter'] .field textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 1.5em;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+  opacity: 0;
+  resize: none;
+  transform: translate(var(--x, 50%), var(--y, 50%));
+}
+
+.desk .foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+
+.desk .foot button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font: 500 var(--text-sm) / 1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.desk .foot button:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.desk .foot button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.desk .foot [data-action='mode'] {
+  margin-left: auto;
+  padding-inline: 0;
+  border: 0;
+  color: var(--ink-faint);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  text-underline-offset: 0.22em;
+}
+
+.desk .foot [data-action='mode']:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.desk[data-mode='plain'] .foot :is([data-action='tear'], [data-action='save']) {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .desk {
+    --stage: 16 / 10;
+  }
+}
+
+@media (max-width: 39.99rem) {
+  .desk {
+    --stage: 4 / 5;
+  }
+}

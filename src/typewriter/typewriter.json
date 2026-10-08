@@ -1,0 +1,80 @@
+{
+  "_": "The robot typewriter's keys and measurements, shared by blender/typewriter.py (which builds it) and typewriter.ts (which works it). Rows are the character keys' positions, number row first, front row last: what each types is a layout's (layouts.ts). Every character key has a typebar of the same id (bone bar_ID) and a key (bone key_ID); the others have keys only. A key's legend cell in the keycap atlas is its position in rows (read in order) and then in others. Measurements are in metres in Blender's frame (Z up, the machine faces -Y, the typist's right is +X).",
+  "rows": [
+    ["r0k0", "r0k1", "r0k2", "r0k3", "r0k4", "r0k5", "r0k6", "r0k7", "r0k8", "r0k9", "r0k10"],
+    ["r1k0", "r1k1", "r1k2", "r1k3", "r1k4", "r1k5", "r1k6", "r1k7", "r1k8", "r1k9", "r1k10", "r1k11"],
+    ["r2k0", "r2k1", "r2k2", "r2k3", "r2k4", "r2k5", "r2k6", "r2k7", "r2k8", "r2k9", "r2k10", "r2k11"],
+    ["r3k0", "r3k1", "r3k2", "r3k3", "r3k4", "r3k5", "r3k6", "r3k7", "r3k8", "r3k9", "r3k10"]
+  ],
+  "others": [
+    {
+      "id": "space",
+      "label": ""
+    },
+    {
+      "id": "shiftL",
+      "label": "⇧"
+    },
+    {
+      "id": "shiftR",
+      "label": "⇧"
+    },
+    {
+      "id": "lock",
+      "label": "⇪"
+    },
+    {
+      "id": "tab",
+      "label": "⇥"
+    },
+    {
+      "id": "back",
+      "label": "⌫"
+    },
+    {
+      "id": "ret",
+      "label": "↵"
+    }
+  ],
+  "atlas": {
+    "columns": 8,
+    "rows": 8
+  },
+  "type": {
+    "_": "The paper's grid: characters per line, the carriage's step per character, the platen's turn per line (as paper travel), and the sheet's width.",
+    "columns": 24,
+    "pitch": 0.024,
+    "line": 0.045,
+    "paperWidth": 0.72
+  },
+  "geometry": {
+    "_": "Owned by typewriter.py: rewritten from the model whenever it changes (blender/build.sh). Metres in Blender frame (Z up, machine faces -Y, typist right = +X). Positions are at rest and [y, z] pairs lie in the plane x = 0 unless a key says otherwise. The carriage bone rests with column 0 at the print point and steps -X one pitch per character (travel = columns * pitch); the platen turns about its local X, positive = line feed (paper moves up at the front).",
+    "print": [0.0, 0.0059, 0.5547],
+    "printAngle": -0.4363,
+    "strike": 1.85,
+    "keyPress": 0.12,
+    "shiftDrop": 0.02,
+    "altDrop": 0.04,
+    "platenAxis": [0.0739, 0.523],
+    "platenRadius": 0.075,
+    "platenX": [-0.112, 0.688],
+    "bail": [0.0464, 0.6077],
+    "bailRoller": 0.018,
+    "exitAngle": 0.2,
+    "roll": [0.28, 0.8],
+    "rollRadius": 0.06,
+    "table": [0.1719, 0.535],
+    "tableTop": [0.2, 0.74],
+    "paperX": [-0.072, 0.648],
+    "carriageTravel": 0.576,
+    "carriageStep": [-0.024, 0, 0],
+    "guideLift": 0.3092,
+    "tapeLift": 0.3299,
+    "bellSwing": 0.5,
+    "leverThrow": 0.9,
+    "bailLift": 0.35,
+    "needleRange": [-0.9, 0.9],
+    "keyTravel": 0.012,
+    "keys": {"r0k0": [-0.4524, -0.72, 0.435, 0.033, 0.035], "r0k1": [-0.3744, -0.72, 0.435, 0.033, 0.035], "r0k2": [-0.2964, -0.72, 0.435, 0.033, 0.035], "r0k3": [-0.2184, -0.72, 0.435, 0.033, 0.035], "r0k4": [-0.1404, -0.72, 0.435, 0.033, 0.035], "r0k5": [-0.0624, -0.72, 0.435, 0.033, 0.035], "r0k6": [0.0156, -0.72, 0.435, 0.033, 0.035], "r0k7": [0.0936, -0.72, 0.435, 0.033, 0.035], "r0k8": [0.1716, -0.72, 0.435, 0.033, 0.035], "r0k9": [0.2496, -0.72, 0.435, 0.033, 0.035], "r0k10": [0.3276, -0.72, 0.435, 0.033, 0.035], "back": [0.429, -0.72, 0.435, 0.0564, 0.035], "tab": [-0.468, -0.8, 0.405, 0.0525, 0.035], "r1k0": [-0.3705, -0.8, 0.405, 0.033, 0.035], "r1k1": [-0.2925, -0.8, 0.405, 0.033, 0.035], "r1k2": [-0.2145, -0.8, 0.405, 0.033, 0.035], "r1k3": [-0.1365, -0.8, 0.405, 0.033, 0.035], "r1k4": [-0.0585, -0.8, 0.405, 0.033, 0.035], "r1k5": [0.0195, -0.8, 0.405, 0.033, 0.035], "r1k6": [0.0975, -0.8, 0.405, 0.033, 0.035], "r1k7": [0.1755, -0.8, 0.405, 0.033, 0.035], "r1k8": [0.2535, -0.8, 0.405, 0.033, 0.035], "r1k9": [0.3315, -0.8, 0.405, 0.033, 0.035], "r1k10": [0.4095, -0.8, 0.405, 0.033, 0.035], "r1k11": [0.4875, -0.8, 0.405, 0.033, 0.035], "lock": [-0.5304, -0.88, 0.375, 0.0486, 0.035], "r2k0": [-0.4368, -0.88, 0.375, 0.033, 0.035], "r2k1": [-0.3588, -0.88, 0.375, 0.033, 0.035], "r2k2": [-0.2808, -0.88, 0.375, 0.033, 0.035], "r2k3": [-0.2028, -0.88, 0.375, 0.033, 0.035], "r2k4": [-0.1248, -0.88, 0.375, 0.033, 0.035], "r2k5": [-0.0468, -0.88, 0.375, 0.033, 0.035], "r2k6": [0.0312, -0.88, 0.375, 0.033, 0.035], "r2k7": [0.1092, -0.88, 0.375, 0.033, 0.035], "r2k8": [0.1872, -0.88, 0.375, 0.033, 0.035], "r2k9": [0.2652, -0.88, 0.375, 0.033, 0.035], "r2k10": [0.3432, -0.88, 0.375, 0.033, 0.035], "r2k11": [0.4212, -0.88, 0.375, 0.033, 0.035], "ret": [0.5226, -0.88, 0.375, 0.0564, 0.035], "shiftL": [-0.4914, -0.96, 0.345, 0.0564, 0.035], "r3k0": [-0.39, -0.96, 0.345, 0.033, 0.035], "r3k1": [-0.312, -0.96, 0.345, 0.033, 0.035], "r3k2": [-0.234, -0.96, 0.345, 0.033, 0.035], "r3k3": [-0.156, -0.96, 0.345, 0.033, 0.035], "r3k4": [-0.078, -0.96, 0.345, 0.033, 0.035], "r3k5": [0.0, -0.96, 0.345, 0.033, 0.035], "r3k6": [0.078, -0.96, 0.345, 0.033, 0.035], "r3k7": [0.156, -0.96, 0.345, 0.033, 0.035], "r3k8": [0.234, -0.96, 0.345, 0.033, 0.035], "r3k9": [0.312, -0.96, 0.345, 0.033, 0.035], "r3k10": [0.39, -0.96, 0.345, 0.033, 0.035], "shiftR": [0.4914, -0.96, 0.345, 0.0564, 0.035], "space": [0.0, -1.04, 0.325, 0.3, 0.03]}
+  }
+}

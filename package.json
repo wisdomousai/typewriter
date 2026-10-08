@@ -1,0 +1,23 @@
+{
+  "name": "typewriter",
+  "private": true,
+  "type": "module",
+  "description": "A robot typewriter in the browser: every key, typebar, spring and bell live in three.js, with layouts you can swap (emoji too).",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "model": "blender/build.sh"
+  },
+  "dependencies": {
+    "@fontsource/maple-mono": "^5.3.0",
+    "astro": "^7.3.8",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/three": "^0.186.0",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,0 +1,128 @@
+---
+import '@fontsource/maple-mono/400.css';
+import '@fontsource/maple-mono/700.css';
+import Typewriter from '../components/Typewriter.astro';
+import { LAYOUTS } from '../typewriter/layouts';
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Typewriter</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Typewriter</h1>
+        <form class="settings" aria-label="Settings">
+          <label>
+            <span>Keyboard</span>
+            <select name="layout">
+              {Object.entries(LAYOUTS).map(([id, l]) => <option value={id}>{l.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Look</span>
+            <select name="look">
+              <option value="auto">Auto</option>
+              <option value="ink">Ink</option>
+              <option value="paper">Paper</option>
+              <option value="colour">Colour</option>
+            </select>
+          </label>
+          <label>
+            <span>Emoji</span>
+            <select name="stamps">
+              <option value="colour">In colour</option>
+              <option value="ink">In ink</option>
+            </select>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="sound" />
+            <span>Sound</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="still" />
+            <span>Reduced motion</span>
+          </label>
+        </form>
+      </header>
+      <Typewriter />
+    </main>
+
+    <script>
+      import { setUpDesk } from '../typewriter/desk';
+      import { LAYOUTS, type LayoutName } from '../typewriter/layouts';
+      import type { LookName } from '../typewriter/looks';
+
+      // Settings: the address wins (so a link carries them), then what this browser chose last.
+      const STORE = 'typewriter-settings';
+      const defaults = {
+        layout: 'us-qwerty',
+        look: 'auto',
+        stamps: 'colour',
+        sound: '1',
+        still: matchMedia('(prefers-reduced-motion: reduce)').matches ? '1' : '',
+      };
+      type Settings = typeof defaults;
+      let saved: Partial<Settings> = {};
+      try {
+        saved = JSON.parse(localStorage.getItem(STORE) ?? '{}');
+      } catch {}
+      const query = Object.fromEntries(new URLSearchParams(location.search));
+      const settings: Settings = { ...defaults, ...saved, ...query };
+      if (!(settings.layout in LAYOUTS)) settings.layout = defaults.layout;
+
+      const panel = document.querySelector<HTMLFormElement>('.settings')!;
+      (panel.elements.namedItem('layout') as HTMLSelectElement).value = settings.layout;
+      (panel.elements.namedItem('look') as HTMLSelectElement).value = settings.look;
+      (panel.elements.namedItem('stamps') as HTMLSelectElement).value = settings.stamps;
+      (panel.elements.namedItem('still') as HTMLInputElement).checked = !!settings.still;
+      (panel.elements.namedItem('sound') as HTMLInputElement).checked = !!settings.sound;
+      const VOLUME = 0.7;
+
+      const dark = matchMedia('(prefers-color-scheme: dark)');
+      const look = (): LookName =>
+        settings.look === 'auto' ? (dark.matches ? 'paper' : 'ink') : (settings.look as LookName);
+
+      const desk = setUpDesk(document.querySelector<HTMLElement>('.desk')!, {
+        models: `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}models/`,
+        look,
+        layout: settings.layout as LayoutName,
+        reducedMotion: !!settings.still,
+        volume: settings.sound ? VOLUME : 0,
+        onReady: (tw) => tw && (tw.paper.stamps = settings.stamps as 'colour' | 'ink'),
+      });
+      dark.addEventListener('change', desk.relook);
+      if (import.meta.env.DEV) Object.assign(window, { desk });
+
+      panel.addEventListener('change', () => {
+        const data = new FormData(panel);
+        settings.layout = String(data.get('layout'));
+        settings.look = String(data.get('look'));
+        settings.stamps = String(data.get('stamps'));
+        settings.still = data.get('still') ? '1' : '';
+        settings.sound = data.get('sound') ? '1' : '';
+        try {
+          localStorage.setItem(STORE, JSON.stringify(settings));
+        } catch {}
+        const url = new URL(location.href);
+        for (const [k, v] of Object.entries(settings))
+          if (v === defaults[k as keyof Settings]) url.searchParams.delete(k);
+          else url.searchParams.set(k, v);
+        history.replaceState(null, '', url);
+        const tw = desk.typewriter;
+        if (!tw) return;
+        tw.setLayout(settings.layout as LayoutName);
+        tw.paper.stamps = settings.stamps as 'colour' | 'ink';
+        tw.reducedMotion = !!settings.still;
+        desk.setVolume(settings.sound ? VOLUME : 0);
+        desk.relook();
+      });
+    </script>
+  </body>
+</html>

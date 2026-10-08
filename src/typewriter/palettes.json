@@ -1,0 +1,24 @@
+{
+  "typewriter": {
+    "base": {
+      "shell": "#2f6b5e",
+      "joint": "#b9b4a6",
+      "bezel": "#22231f",
+      "glow": "#fff3d6"
+    },
+    "roles": {
+      "Cap": "#26262a",
+      "Platen": "#2a2a2e",
+      "Paper": "#f4f1e8",
+      "Knob": "#e8c66a",
+      "Leg": "#22231f",
+      "Tape": "#f7f7f2",
+      "Ribbon": "#b8322a",
+      "Rim": "#d4ae5a"
+    },
+    "dots": [
+      "#4a3a22",
+      "#ffb454"
+    ]
+  }
+}

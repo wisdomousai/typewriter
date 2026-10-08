@@ -1,0 +1,49 @@
+---
+// A form on the robot typewriter: its fields are typed onto the machine's paper. The workings
+// are in desk.ts; this writes the markup, so the form is there before any script runs.
+import { FIELDS } from '../typewriter/desk';
+import './desk.css';
+---
+
+<div class="desk" data-mode="plain" hidden>
+  <div class="stage" aria-hidden="true">
+    <canvas></canvas>
+  </div>
+  <form class="letter" novalidate>
+    {
+      FIELDS.map((f) => {
+        const Tag = f.name === 'message' ? 'textarea' : 'input';
+        return (
+          <p class="field">
+            <label for={`letter-${f.name}`}>{f.label}</label>
+            <Tag
+              id={`letter-${f.name}`}
+              name={f.name}
+              data-label={f.label.toUpperCase()}
+              data-top={f.top}
+              data-lines={f.lines}
+              {...f.attrs}
+            />
+          </p>
+        );
+      })
+    }
+  </form>
+  <div class="foot">
+    <button type="button" data-action="tear">Tear off</button>
+    <button type="button" data-action="save">Save as picture</button>
+    <button type="button" data-action="mode">Plain form</button>
+  </div>
+</div>
+<script is:inline>
+  // Before first paint: the typewriter unless this browser asked for the plain form.
+  (function (desk) {
+    var mode = 'typewriter';
+    try {
+      if (localStorage.getItem('typewriter-form') === 'plain') mode = 'plain';
+    } catch (e) {}
+    desk.dataset.mode = mode;
+    desk.hidden = false;
+  })(document.currentScript.previousElementSibling);
+</script>
+<noscript><p>The typewriter needs JavaScript.</p></noscript>
