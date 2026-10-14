@@ -2,7 +2,7 @@
   "name": "typewriter",
   "private": true,
   "type": "module",
-  "description": "Robot machines in the browser: a typewriter whose every key, typebar, spring and bell move live in three.js, a teleprinter that prints telegrams on endless paper, and a chat where each person types on their own.",
+  "description": "A robot typewriter that types in your browser.",
   "license": "MIT",
   "repository": {
     "type": "git",
